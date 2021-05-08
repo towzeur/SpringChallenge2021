@@ -1,4 +1,9 @@
-from action.WaitAction import WaitAction
+#from action.WaitAction import WaitAction
+from Sun import Sun
 
 
+s = Sun()
+print(s.getOrientation())
+s.setOrientation(4)
+print(s.getOrientation())
 
