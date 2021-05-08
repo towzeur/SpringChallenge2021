@@ -1,14 +1,6 @@
-# Spring Challenge 2021
+# Spring Challenge 2021 python engine
 
-Source code for CodinGame's Spring Challenge 2021 event.
-
-https://www.codingame.com/contests/spring-challenge-2021/
-
-Community starter AIs are located here:
-
-https://github.com/CodinGame/SpringChallenge2021/tree/main/starterAIs
+CodinGame's Spring Challenge 2021 event's game engine **python** translation.
 
 
-Introduction video by Gaurav Sen:
 
-https://youtu.be/gZMdOiqchDk
