@@ -1,5 +1,4 @@
 import time
-import ConfigParser
 
 
 class Singleton(type):
