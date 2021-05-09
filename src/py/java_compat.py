@@ -1,4 +1,5 @@
 import time
+import ConfigParser
 
 
 class Singleton(type):
@@ -86,3 +87,25 @@ class Random:
 
     def nextGaussian(self):
         raise NotImplementedError
+
+
+class Properties:
+    def __init__(self, filename=".properties"):
+        self.filename = filename
+        self._properties = Properties.load_properties(filename)
+
+    @classmethod
+    def load_properties(filename, sep="=", comment_char="#"):
+        properties = {}
+        with open(filename, "rt") as f:
+            for line in f:
+                l = line.strip()
+                if l and not l.startswith(comment_char):
+                    key_value = l.split(sep)
+                    key = key_value[0].strip()
+                    value = sep.join(key_value[1:]).strip().strip('"')
+                    properties[key] = value
+        return properties
+
+    def getProperty(self, name: str) -> str:
+        return self._properties.get(name, None)
