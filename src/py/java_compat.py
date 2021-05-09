@@ -1,4 +1,5 @@
 import time
+from typing import List, Any
 
 
 class Singleton(type):
@@ -108,3 +109,16 @@ class Properties:
 
     def getProperty(self, name: str) -> str:
         return self._properties.get(name, None)
+
+
+class Collections:
+    """
+    https://hg.openjdk.java.net/jdk8/jdk8/jdk/file/687fd7c7986d/src/share/classes/java/util/Collections.java
+    """
+
+    @staticmethod
+    def shuffle(lst: List[Any], rnd: Random):
+        size: int = len(lst)
+        for i in range(size, 1, -1):
+            j: int = rnd.nextInt(i)
+            lst[i - 1], lst[j] = lst[j], lst[i - 1]  # swap(arr, i-1, j);
