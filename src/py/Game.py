@@ -59,8 +59,7 @@ class Game(metaclass=Singleton):
 
     def __init__(self):
         # public
-        self.nutrients: int = Config.STARTING_NUTRIENTS
-
+        self.nutrients: int = None
         self.board: Board = None
         self.trees: Dict[int, Tree] = None
         self.dyingTrees: List[CubeCoord] = None
@@ -70,14 +69,14 @@ class Game(metaclass=Singleton):
         self.shadows: Dict[int, int] = None
         self.cells: List[Cell] = None
         self.random : Random = None
-        self.round : int = 0
-        self.turn : int = 0
-        self.currentFrameType : FrameType = FrameType.INIT
-        self.nextFrameType : FrameType = FrameType.GATHERING
+        self.round : int = None
+        self.turn : int = None
+        self.currentFrameType : FrameType = None
+        self.nextFrameType : FrameType = None
 
         # private
-        self._gameManager: MultiplayerGameManager<Player> #@Inject private
-        self._gameSummaryManager: GameSummaryManager #@Inject private
+        self._gameManager: MultiplayerGameManager<Player> = None #@Inject private
+        self._gameSummaryManager: GameSummaryManager = None #@Inject private
         
         
     def init(self, seed: int):
@@ -119,21 +118,24 @@ class Game(metaclass=Singleton):
             Game.STARTING_TREES_ON_EDGES = True
         
 
-        self.random = Random(seed)
+        self.nutrients = Config.STARTING_NUTRIENTS
         self.board = BoardGenerator.generate(self.random)
         self.trees = TreeMap<>()
         self.dyingTrees = list()
-        self.cells = list()
         self.availableSun = ArrayList<>(self._gameManager.getPlayerCount()) # CHECK
         self.sentSeeds = list()
-        self.initStartingTrees()
-
         self.sun = Sun()
-        self.sun.setOrientation(0)
-
         self.shadows = dict()
-
+        self.cells = list()
+        self.random = Random(seed)
         self.round = 0
+        self.turn = 0
+        self.currentFrameType = FrameType.INIT
+        self.nextFrameType = FrameType.GATHERING
+        
+        
+        self.initStartingTrees()
+        self.sun.setOrientation(0)
         if Game.ENABLE_SHADOW:
             self._calculateShadows()
         
@@ -162,39 +164,42 @@ class Game(metaclass=Singleton):
         if Game.STARTING_TREES_ON_EDGES:
             startingCoords = self._getBoardEdges()
         else:
-            startingCoords = [coord for coord in self.board.coords if not(coord.getX()==0 and coord.getY()==0 and coord.getZ()==0)]
+            startingCoords = [coord for coord in self.board.coords if not coord.isOrigin()]
         
+        startingCoords = [
+            coord for coord in self.board.coords 
+            if self.board.map[coord].getRichness() != Constants.RICHNESS_NULL
+        ]
 
         validCoords: List[CubeCoord] = list()
-        while (len(validCoords) < Game.STARTING_TREE_COUNT * 2):
+        while len(validCoords) < Game.STARTING_TREE_COUNT * 2:
             validCoords = self._tryInitStartingTrees(startingCoords)
         
 
-        players: List<Player> = self._gameManager.getPlayers()
+        players: List[Player] = self._gameManager.getPlayers()
         for i in range(Game.STARTING_TREE_COUNT):
-            self._placeTree(players[0], self.board.map.get(validCoords.get(2 * i)).getIndex(), Game.STARTING_TREE_SIZE)
-            self._placeTree(players[1], self.board.map.get(validCoords.get(2 * i + 1)).getIndex(), Game.STARTING_TREE_SIZE)
+            self._placeTree(players[0], self.board.map[validCoords.get(2 * i)].getIndex(), Game.STARTING_TREE_SIZE)
+            self._placeTree(players[1], self.board.map[validCoords.get(2 * i + 1)].getIndex(), Game.STARTING_TREE_SIZE)
         
     
 
     def _tryInitStartingTrees(self, startingCoords: List[CubeCoord]) -> List[CubeCoord]: 
         coordinates: List[CubeCoord] = list()
-
         for i in range(Game.STARTING_TREE_COUNT):
- 
             if not startingCoords:
                 return coordinates
-            
-            r: int = self.random.nextInt(startingCoords.size())
-            normalCoord: CubeCoord = startingCoords.get(r)
+            r: int = self.random.nextInt(len(startingCoords))
+            normalCoord: CubeCoord = startingCoords[r]
             oppositeCoord: CubeCoord = normalCoord.getOpposite()
-            startingCoords.removeIf(coord ->:
-                return coord.distanceTo(normalCoord) <= Game.STARTING_TREE_DISTANCE or
+            startingCoords = [
+                coord for coord in startingCoords
+                if not(
+                    coord.distanceTo(normalCoord) <= Game.STARTING_TREE_DISTANCE or
                     coord.distanceTo(oppositeCoord) <= Game.STARTING_TREE_DISTANCE
-            )
+                )
+            ]
             coordinates.append(normalCoord)
             coordinates.append(oppositeCoord)
-        
         return coordinates
     
 
@@ -211,13 +216,12 @@ class Game(metaclass=Singleton):
                         
 
     def _getBoardEdges(self) -> List[CubeCoord]:
-        centre: CubeCoord = CubeCoord(0, 0, 0)
-        return [coord for coord in self.board.coords if coord.distanceTo(centre) == Config.MAP_RING_COUNT]
+        return [coord for coord in self.board.coords if coord.norm() == Config.MAP_RING_COUNT]
 
     def getCurrentFrameInfoFor(self, player: Player) -> List[str]:
         lines: List[str] = list()
         lines.append(str(self.round))
-        lines.append(str(nutriments))
+        lines.append(str(self.nutrients))
 
         #Player information, receiving player first
         other: Player = self._gameManager.getPlayer(1 - player.getIndex())
@@ -243,17 +247,12 @@ class Game(metaclass=Singleton):
         return lines
     
 
-    @staticmethod
-    def _cubeAdd(a: CubeCoord, b: CubeCoord) -> CubeCoord:
-        return CubeCoord(a.getX() + b.getX(), a.getY() + b.getY(), a.getZ() + b.getZ())
-    
-
     def _getCoordsInRange(self, center: CubeCoord, N: int) -> List[CubeCoord]:
         results : List[CubeCoord] = list()
         for x in range(-N, N+1):
             for y in range(max(-N, -x-N), min(+N, -x+N)+1):
                 z: int = -x - y
-                results.append(Game._cubeAdd(center, CubeCoord(x, y, z)))
+                results.append(CubeCoord.cubeAdd(center, CubeCoord(x, y, z)))
         return results
     
 
