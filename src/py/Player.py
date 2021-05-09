@@ -2,7 +2,7 @@
 from action.Action import Action
 from Config import Config
 
-# import com.codingame.gameengine.core.AbstractMultiplayerPlayer
+from codingame import AbstractMultiplayerPlayer
 
 
 class Player(AbstractMultiplayerPlayer):
