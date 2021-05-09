@@ -1,4 +1,4 @@
-
+from .GameException import GameException
 
 class TreeTooFarException(GameException):
 

@@ -1,5 +1,3 @@
-
-
 class GameException(Exception):
     """Base class for game exceptions in this module."""
 
