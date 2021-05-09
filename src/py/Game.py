@@ -49,6 +49,7 @@ class Game(metaclass=Singleton):
     @Inject private GameSummaryManager gameSummaryManager
     nutrients: int = Config.STARTING_NUTRIENTS
 
+    # static
     ENABLE_SEED : bool = None
     ENABLE_GROW : bool = None
     ENABLE_SHADOW : bool = None
@@ -77,39 +78,39 @@ class Game(metaclass=Singleton):
 
         if gameManager.getLeagueLevel() == 1:
             # Wood 2
-            MAX_ROUNDS = 1
-            ENABLE_SEED = False
-            ENABLE_GROW = False
-            ENABLE_SHADOW = False
-            ENABLE_HOLES = False
-            STARTING_TREE_COUNT = 6
-            STARTING_TREE_SIZE = Constants.TREE_TALL
-            STARTING_TREE_DISTANCE = 0
-            STARTING_TREES_ON_EDGES = False
+            Game.MAX_ROUNDS = 1
+            Game.ENABLE_SEED = False
+            Game.ENABLE_GROW = False
+            Game.ENABLE_SHADOW = False
+            Game.ENABLE_HOLES = False
+            Game.STARTING_TREE_COUNT = 6
+            Game.STARTING_TREE_SIZE = Constants.TREE_TALL
+            Game.STARTING_TREE_DISTANCE = 0
+            Game.STARTING_TREES_ON_EDGES = False
           
         elif gameManager.getLeagueLevel() == 2:
             # Wood 1
-            MAX_ROUNDS = 6
-            ENABLE_SEED = False
-            ENABLE_GROW = True
-            ENABLE_SHADOW = False
-            ENABLE_HOLES = False
-            STARTING_TREE_COUNT = 4
-            STARTING_TREE_SIZE = Constants.TREE_SMALL
-            STARTING_TREE_DISTANCE = 1
-            STARTING_TREES_ON_EDGES = False
+            Game.MAX_ROUNDS = 6
+            Game.ENABLE_SEED = False
+            Game.ENABLE_GROW = True
+            Game.ENABLE_SHADOW = False
+            Game.ENABLE_HOLES = False
+            Game.STARTING_TREE_COUNT = 4
+            Game.STARTING_TREE_SIZE = Constants.TREE_SMALL
+            Game.STARTING_TREE_DISTANCE = 1
+            Game.STARTING_TREES_ON_EDGES = False
             
         else:
             # Bronze+
-            MAX_ROUNDS = Config.MAX_ROUNDS
-            ENABLE_SEED = True
-            ENABLE_GROW = True
-            ENABLE_SHADOW = True
-            ENABLE_HOLES = True
-            STARTING_TREE_COUNT = Constants.STARTING_TREE_COUNT
-            STARTING_TREE_SIZE = Constants.TREE_SMALL
-            STARTING_TREE_DISTANCE = 2
-            STARTING_TREES_ON_EDGES = True
+            Game.MAX_ROUNDS = Config.Game.MAX_ROUNDS
+            Game.ENABLE_SEED = True
+            Game.ENABLE_GROW = True
+            Game.ENABLE_SHADOW = True
+            Game.ENABLE_HOLES = True
+            Game.STARTING_TREE_COUNT = Constants.Game.STARTING_TREE_COUNT
+            Game.STARTING_TREE_SIZE = Constants.TREE_SMALL
+            Game.STARTING_TREE_DISTANCE = 2
+            Game.STARTING_TREES_ON_EDGES = True
         
 
         random = Random(seed)
@@ -127,16 +128,16 @@ class Game(metaclass=Singleton):
         shadows = dict()
 
         round = 0
-        if ENABLE_SHADOW:
+        if Game.ENABLE_SHADOW:
             self._calculateShadows()
         
     
-
-    def getExpected(self) -> str:
-        if not ENABLE_GROW and not ENABLE_SEED:
+    @staticmethod
+    def getExpected() -> str:
+        if not Game.ENABLE_GROW and not Game.ENABLE_SEED:
             return "COMPLETE <idx> | WAIT"
     
-        if not ENABLE_SEED and ENABLE_GROW:
+        if not Game.ENABLE_SEED and Game.ENABLE_GROW:
             return "GROW <idx> | COMPLETE <idx> | WAIT"
         
         return "SEED <from> <to> | GROW <idx> | COMPLETE <idx> | WAIT"
@@ -152,28 +153,28 @@ class Game(metaclass=Singleton):
     def initStartingTrees(self):
 
         startingCoords: List[CubeCoord] = list()
-        if STARTING_TREES_ON_EDGES:
+        if Game.STARTING_TREES_ON_EDGES:
             startingCoords = self._getBoardEdges()
         else:
             startingCoords = [coord for coord in board.coords if not(coord.getX()==0 and coord.getY()==0 and coord.getZ()==0)]
         
 
         validCoords: List[CubeCoord] = list()
-        while (len(validCoords) < STARTING_TREE_COUNT * 2):
+        while (len(validCoords) < Game.STARTING_TREE_COUNT * 2):
             validCoords = self._tryInitStartingTrees(startingCoords)
         
 
         players: List<Player> = gameManager.getPlayers()
-        for i in range(STARTING_TREE_COUNT):
-            self._placeTree(players[0], board.map.get(validCoords.get(2 * i)).getIndex(), STARTING_TREE_SIZE)
-            self._placeTree(players[1], board.map.get(validCoords.get(2 * i + 1)).getIndex(), STARTING_TREE_SIZE)
+        for i in range(Game.STARTING_TREE_COUNT):
+            self._placeTree(players[0], board.map.get(validCoords.get(2 * i)).getIndex(), Game.STARTING_TREE_SIZE)
+            self._placeTree(players[1], board.map.get(validCoords.get(2 * i + 1)).getIndex(), Game.STARTING_TREE_SIZE)
         
     
 
     def _tryInitStartingTrees(self, startingCoords: List[CubeCoord]) -> List[CubeCoord]: 
         coordinates: List[CubeCoord] = list()
 
-        for i in range(STARTING_TREE_COUNT):
+        for i in range(Game.STARTING_TREE_COUNT):
  
             if not startingCoords:
                 return coordinates
@@ -182,8 +183,8 @@ class Game(metaclass=Singleton):
             normalCoord: CubeCoord = startingCoords.get(r)
             oppositeCoord: CubeCoord = normalCoord.getOpposite()
             startingCoords.removeIf(coord ->:
-                return coord.distanceTo(normalCoord) <= STARTING_TREE_DISTANCE or
-                    coord.distanceTo(oppositeCoord) <= STARTING_TREE_DISTANCE
+                return coord.distanceTo(normalCoord) <= Game.STARTING_TREE_DISTANCE or
+                    coord.distanceTo(oppositeCoord) <= Game.STARTING_TREE_DISTANCE
             )
             coordinates.append(normalCoord)
             coordinates.append(oppositeCoord)
@@ -278,7 +279,7 @@ class Game(metaclass=Singleton):
             if growCost <= player.getSun() and not tree.isDormant():
                 if tree.getSize() == Constants.TREE_TALL:
                     possibleCompletes.append(f"COMPLETE {index}")
-                elif ENABLE_GROW:
+                elif Game.ENABLE_GROW:
                     possibleGrows.append(f"GROW {index}")
                 
 
@@ -291,7 +292,7 @@ class Game(metaclass=Singleton):
     
 
     def _playerCanSeedFrom(self, player: Player, tree: Tree, seedCost: int) -> bool:
-        return ENABLE_SEED and
+        return Game.ENABLE_SEED and
             (seedCost <= player.getSun()) and
             (tree.getSize() > Constants.TREE_SEED) and
             (not tree.isDormant())
@@ -333,10 +334,9 @@ class Game(metaclass=Singleton):
     
 
     def _getGrowthCost(self, targetTree: Tree) -> int:
-        int targetSize = targetTree.getSize() + 1
-        if (targetSize > Constants.TREE_TALL):
+        targetSize: int = targetTree.getSize() + 1
+        if targetSize > Constants.TREE_TALL:
             return Constants.LIFECYCLE_END_COST
-        
         return self._getCostFor(targetSize, targetTree.getOwner())
     
 
@@ -345,9 +345,9 @@ class Game(metaclass=Singleton):
     
 
     def _doGrow(self, player: Player, action: Action):
-        CubeCoord coord = self._getCoordByIndex(action.getTargetId())
-        Cell cell = board.map.get(coord)
-        Tree targetTree = trees.get(cell.getIndex())
+        coord: CubeCoord = self._getCoordByIndex(action.getTargetId())
+        cell: Cell = board.map.get(coord)
+        targetTree: Tree = trees.get(cell.getIndex())
 
         if targetTree is None:
             raise TreeNotFoundException(cell.getIndex())
@@ -538,9 +538,9 @@ class Game(metaclass=Singleton):
 
     def performSunMoveUpdate(self):
         round += 1
-        if (round < MAX_ROUNDS):
+        if (round < Game.MAX_ROUNDS):
             sun.move()
-            if (ENABLE_SHADOW):
+            if (Game.ENABLE_SHADOW):
                 self._calculateShadows()
             
         
@@ -648,7 +648,7 @@ class Game(metaclass=Singleton):
     
 
     def _gameOver(self) -> bool:
-        return (gameManager.getActivePlayers().size() <= 1) or (round >= MAX_ROUNDS)
+        return (gameManager.getActivePlayers().size() <= 1) or (round >= Game.MAX_ROUNDS)
     
 
     def getRound(self) -> int:
