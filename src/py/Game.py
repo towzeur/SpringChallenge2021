@@ -13,6 +13,7 @@ import sys
 from typing import List, Dict
 
 from action.Action import Action
+
 from exception.AlreadyActivatedTree import AlreadyActivatedTree
 from exception.CellNotEmptyException import CellNotEmptyException
 from exception.CellNotFoundException import CellNotFoundException
@@ -30,7 +31,7 @@ import com.codingame.gameengine.core.MultiplayerGameManager
 
 #import com.google.inject.Inject
 #import com.google.inject.Singleton
-from java_compat import Singleton, Random
+from java_compat import Singleton, Random, Collections
 
 from Board import Board
 from BoardGenerator import BoardGenerator
@@ -297,16 +298,11 @@ class Game(metaclass=Singleton):
     
 
     def _playerCanSeedFrom(self, player: Player, tree: Tree, seedCost: int) -> bool:
-        return Game.ENABLE_SEED and
-            (seedCost <= player.getSun()) and
-            (tree.getSize() > Constants.TREE_SEED) and
-            (not tree.isDormant())
+        return Game.ENABLE_SEED and (seedCost <= player.getSun()) and (tree.getSize() > Constants.TREE_SEED) and (not tree.isDormant())
     
 
     def playerCanSeedTo(self, targetCell: Cell, player: Player) -> bool:
-        return targetCell.isValid() and
-            (targetCell.getRichness() != Constants.RICHNESS_NULL) and
-            (targetCell.getIndex() not in self.trees)
+        return targetCell.isValid() and (targetCell.getRichness() != Constants.RICHNESS_NULL) and (targetCell.getIndex() not in self.trees)
     
 
     def getGlobalInfoFor(self, player: Player) -> List[str]:
@@ -321,7 +317,7 @@ class Game(metaclass=Singleton):
     
 
     def getNeighbourIds(self, coord: CubeCoord) -> str:
-        orderedNeighborIds: List<int> = [
+        orderedNeighborIds: List[int] = [
             self.board.map.get(coord.neighbor(i), Cell.NO_CELL).getIndex()
             for i in range(len(CubeCoord.directions))
         ]
@@ -418,39 +414,32 @@ class Game(metaclass=Singleton):
         targetCoord: CubeCoord = self._getCoordByIndex(action.getTargetId())
         sourceCoord: CubeCoord = self._getCoordByIndex(action.getSourceId())
 
-        targetCell: Cell = self.board.map.get(targetCoord)
-        sourceCell: Cell = self.board.map.get(sourceCoord)
+        targetCell: Cell = self.board.map[targetCoord]
+        sourceCell: Cell = self.board.map[sourceCoord]
 
+        # check if the move is possible
         if self._aTreeIsOn(targetCell):
             raise CellNotEmptyException(targetCell.getIndex())
-        
-        Tree sourceTree = trees.get(sourceCell.getIndex())
-        if (sourceTree == null):
+        sourceTree: Tree = self.trees.get(sourceCell.getIndex(), None)
+        if sourceTree is None:
             raise TreeNotFoundException(sourceCell.getIndex())
-        
-        if (sourceTree.getSize() == Constants.TREE_SEED):
+        if sourceTree.getSize() == Constants.TREE_SEED:
             raise TreeIsSeedException(sourceCell.getIndex())
-        
-        if (sourceTree.getOwner() != player):
+        if sourceTree.getOwner() != player:
             raise NotOwnerOfTreeException(sourceCell.getIndex(), sourceTree.getOwner())
-        
-        if (sourceTree.isDormant()):
+        if sourceTree.isDormant():
             raise AlreadyActivatedTree(sourceCell.getIndex())
-        
-
-        int distance = sourceCoord.distanceTo(targetCoord)
-        if (distance > sourceTree.getSize()):
+        distance: int = sourceCoord.distanceTo(targetCoord)
+        if distance > sourceTree.getSize():
             raise TreeTooFarException(sourceCell.getIndex(), targetCell.getIndex())
-        
-        if (targetCell.getRichness() == Constants.RICHNESS_NULL):
+        if targetCell.getRichness() == Constants.RICHNESS_NULL:
             raise CellNotValidException(targetCell.getIndex())
-        
-
         costOfSeed: int = self._getSeedCost(player)
         currentSun: int = self.availableSun[player.getIndex()]
         if currentSun < costOfSeed:
             raise NotEnoughSunException(costOfSeed, player.getSun())
         
+        # the seed action is valid : do it
         self.availableSun[player.getIndex()] = currentSun - costOfSeed
         sourceTree.setDormant()
         seed: Seed = Seed()
@@ -463,13 +452,13 @@ class Game(metaclass=Singleton):
     
 
     def _aTreeIsOn(self, cell: Cell) -> bool:
-        return self.trees.containsKey(cell.getIndex())
+        return cell.getIndex() in self.trees
     
 
     def _giveSun(self):
         givenToPlayer: List[int] = [None, None]
 
-        for (index, tree) in self.trees.items():
+        for index, tree in self.trees.items():
             if (index not in self.shadows) or (self.shadows[index] < tree.getSize()): # CHECK
                 owner: Player = tree.getOwner()
                 owner.addSun(tree.getSize())
@@ -490,7 +479,7 @@ class Game(metaclass=Singleton):
             points: int = self.nutrients
             if cell.getRichness() == Constants.RICHNESS_OK:
                 points += Constants.RICHNESS_BONUS_OK
-             elif cell.getRichness() == Constants.RICHNESS_LUSH:
+            elif cell.getRichness() == Constants.RICHNESS_LUSH:
                 points += Constants.RICHNESS_BONUS_LUSH
             
             player: Player = self.trees.get(cell.getIndex()).getOwner()
@@ -510,18 +499,18 @@ class Game(metaclass=Singleton):
 
         if self.currentFrameType == FrameType.GATHERING:
             self._gameSummaryManager.addRound(self.round)
-            performSunGatheringUpdate()
+            self.performSunGatheringUpdate()
             self.nextFrameType = FrameType.ACTIONS
             
         elif self.currentFrameType == FrameType.ACTIONS:
             self._gameSummaryManager.addRound(self.round)
-            performActionUpdate()
+            self.performActionUpdate()
             if self._allPlayersAreWaiting():
                 self.nextFrameType = FrameType.SUN_MOVE
             
         elif self.currentFrameType == FrameType.SUN_MOVE:
             self._gameSummaryManager.addRoundTransition(self.round)
-            performSunMoveUpdate()
+            self.performSunMoveUpdate()
             self.nextFrameType = FrameType.GATHERING
             
         else:
@@ -649,6 +638,7 @@ class Game(metaclass=Singleton):
     
 
     def _gameOver(self) -> bool:
+        # CHECK
         return (self._gameManager.getActivePlayers().size() <= 1) or (self.round >= Game.MAX_ROUNDS)
     
 
