@@ -46,7 +46,7 @@ class Game(metaclass=Singleton):
 
     @Inject private MultiplayerGameManager<Player> gameManager
     @Inject private GameSummaryManager gameSummaryManager
-    int nutrients = Config.STARTING_NUTRIENTS
+    nutrients: int = Config.STARTING_NUTRIENTS
 
     ENABLE_SEED : bool = None
     ENABLE_GROW : bool = None
@@ -150,7 +150,7 @@ class Game(metaclass=Singleton):
 
     def initStartingTrees(self):
 
-        startingCoords: List[CubeCoord] = ArrayList[CubeCoord]()
+        startingCoords: List[CubeCoord] = list()
         if STARTING_TREES_ON_EDGES:
             startingCoords = self._getBoardEdges()
         else:
@@ -164,49 +164,52 @@ class Game(metaclass=Singleton):
             Cell cell = board.map.get(coord)
             return cell.getRichness() == Constants.RICHNESS_NULL
         )
-        List[CubeCoord] validCoords = ArrayList[CubeCoord]()
 
-        while (validCoords.size() < STARTING_TREE_COUNT * 2):
+        validCoords: List[CubeCoord] = list()
+        while (len(validCoords) < STARTING_TREE_COUNT * 2):
             validCoords = self._tryInitStartingTrees(startingCoords)
         
 
-        List<Player> players = gameManager.getPlayers()
-        for (int i = 0 i < STARTING_TREE_COUNT i++):
-            self._placeTree(players.get(0), board.map.get(validCoords.get(2 * i)).getIndex(), STARTING_TREE_SIZE)
-            self._placeTree(players.get(1), board.map.get(validCoords.get(2 * i + 1)).getIndex(), STARTING_TREE_SIZE)
+        players: List<Player> = gameManager.getPlayers()
+        for i in range(STARTING_TREE_COUNT):
+            self._placeTree(players[0], board.map.get(validCoords.get(2 * i)).getIndex(), STARTING_TREE_SIZE)
+            self._placeTree(players[1], board.map.get(validCoords.get(2 * i + 1)).getIndex(), STARTING_TREE_SIZE)
         
     
 
     def _tryInitStartingTrees(self, startingCoords: List[CubeCoord]) -> List[CubeCoord]: 
-        List[CubeCoord] coordinates = ArrayList[CubeCoord]()
+        coordinates: List[CubeCoord] = ArrayList[CubeCoord]()
 
-        List[CubeCoord] availableCoords = ArrayList<>(startingCoords)
-        for (int i = 0 i < STARTING_TREE_COUNT i++):
-            if (availableCoords.isEmpty()):
+        availableCoords: List[CubeCoord] = ArrayList<>(startingCoords)
+
+        for i in range(STARTING_TREE_COUNT):
+ 
+            if not availableCoords:
                 return coordinates
             
-            int r = random.nextInt(availableCoords.size())
+            r: int = random.nextInt(availableCoords.size())
             CubeCoord normalCoord = availableCoords.get(r)
             CubeCoord oppositeCoord = normalCoord.getOpposite()
             availableCoords.removeIf(coord ->:
                 return coord.distanceTo(normalCoord) <= STARTING_TREE_DISTANCE or
                     coord.distanceTo(oppositeCoord) <= STARTING_TREE_DISTANCE
             )
-            coordinates.add(normalCoord)
-            coordinates.add(oppositeCoord)
+            coordinates.append(normalCoord)
+            coordinates.append(oppositeCoord)
         
         return coordinates
     
 
     def _calculateShadows(self):
         shadows.clear()
-        trees.forEach((index, tree) ->:
-            CubeCoord coord = board.coords.get(index)
-            for (int i = 1 i <= tree.getSize() i++):
-                CubeCoord tempCoord = coord.neighbor(sun.getOrientation(), i)
-                if (board.map.containsKey(tempCoord)):
+        for index, tree in trees.items(): 
+            coord: CubeCoord = board.coords.get(index)
+            for i in range(1, tree.getSize()+1):
+            
+                tempCoord: CubeCoord = coord.neighbor(sun.getOrientation(), i)
+                if tempCoord in board.map:
                     shadows.compute(
-                        board.map.get(tempCoord).getIndex(),
+                        board.map[tempCoord].getIndex(),
                         (key, value) -> value == null ? tree.getSize() : max(value, tree.getSize())
                     )
                 
@@ -216,50 +219,33 @@ class Game(metaclass=Singleton):
 
     def _getBoardEdges(self) -> List[CubeCoord]:
         centre: CubeCoord = CubeCoord(0, 0, 0)
-        return board.coords.stream()
-            .filter(coord -> coord.distanceTo(centre) == Config.MAP_RING_COUNT)
-            .collect(Collectors.toList())
-    
+        return [coord for coord in board.coords if coord.distanceTo(centre) == Config.MAP_RING_COUNT]
 
     def getCurrentFrameInfoFor(self, player: Player) -> List[str]:
-        List[str] lines = list()
-        lines.add(String.valueOf(round))
-        lines.add(String.valueOf(nutrients))
+        lines: List[str] = list()
+        lines.append(str(round))
+        lines.append(str(nutrients))
+
         #Player information, receiving player first
-        Player other = gameManager.getPlayer(1 - player.getIndex())
-        lines.add(
-            String.format(
-                "%d %d",
-                player.getSun(),
-                player.getScore()
-            )
-        )
-        lines.add(
-            String.format(
-                "%d %d %d",
-                other.getSun(),
-                other.getScore(),
-                other.isWaiting() ? 1 : 0
-            )
-        )
-        lines.add(String.valueOf(trees.size()))
-        trees.forEach((index, tree) ->:
-            lines.add(
-                String.format(
-                    "%d %d %d %d",
+        other: Player = gameManager.getPlayer(1 - player.getIndex())
+        lines.append(f"{player.getSun()} {player.getScore()}")
+        lines.append(f"{other.getSun()} {other.getScore()} {1 if other.isWaiting() else 0}")
+        lines.append(f"{len(trees)}")
+
+        for index, tree in trees.items():
+            lines.append(
+                "{} {} {} {}".format(
                     index,
                     tree.getSize(),
-                    tree.getOwner() == player ? 1 : 0,
-                    tree.isDormant() ? 1 : 0
+                    1 if (tree.getOwner() == player) else 0,
+                    1 if tree.isDormant() else 0
                 )
             )
-        )
-
-        List[str] possibleMoves = self._getPossibleMoves(player)
-        lines.add(String.valueOf(possibleMoves.size()))
-        possibleMoves
-            .stream()
-            .forEach(lines::add)
+        
+        possibleMoves: List[str] = self._getPossibleMoves(player)
+        lines.append(str(len(possibleMoves)))
+        for possiblemove in possibleMoves:
+            lines.append(possiblemove)
 
         return lines
     
@@ -271,11 +257,10 @@ class Game(metaclass=Singleton):
 
     def _getCoordsInRange(self, center: CubeCoord, N: int) -> List[CubeCoord]:
         results : List[CubeCoord] = list()
-        for (int x = -N x <= +N x++):
-            for (int y = max(-N, -x - N) y <= min(+N, -x + N) y++):
+        for x in range(-N, N+1):
+            for y in range(max(-N, -x-N), min(+N, -x+N)+1):
                 z: int = -x - y
-                results.add(Game._cubeAdd(center, CubeCoord(x, y, z)))
-            
+                results.append(Game._cubeAdd(center, CubeCoord(x, y, z)))
         return results
     
 
@@ -293,7 +278,7 @@ class Game(metaclass=Singleton):
 
         #For each tree, where they can seed.
         #For each tree, if they can grow.
-        int seedCost = self._getSeedCost(player)
+        seedCost: int = self._getSeedCost(player)
         trees.entrySet()
             .stream()
             .filter(e -> e.getValue().getOwner() == player)
@@ -326,7 +311,7 @@ class Game(metaclass=Singleton):
                                 index
                             )
                         )
-                     else if (ENABLE_GROW):
+                     elif (ENABLE_GROW):
                         possibleGrows.add(
                             String.format(
                                 "GROW %d",
@@ -348,9 +333,9 @@ class Game(metaclass=Singleton):
 
     def _playerCanSeedFrom(self, player: Player, tree: Tree, seedCost: int) -> bool:
         return ENABLE_SEED and
-            seedCost <= player.getSun() and
-            tree.getSize() > Constants.TREE_SEED and
-            !tree.isDormant()
+            (seedCost <= player.getSun()) and
+            (tree.getSize() > Constants.TREE_SEED) and
+            (not tree.isDormant())
     
 
     def playerCanSeedTo(self, targetCell: Cell, player: Player) -> bool:
@@ -371,25 +356,20 @@ class Game(metaclass=Singleton):
     
 
     def getNeighbourIds(self, coord: CubeCoord) -> str:
-        orderedNeighborIds: List<int> = ArrayList<>(CubeCoord.directions.length)
-        for (int i = 0 i < CubeCoord.directions.length ++i):
-            orderedNeighborIds.add(
-                board.map.getOrDefault(coord.neighbor(i), Cell.NO_CELL).getIndex()
-            )
-        
-        return orderedNeighborIds.stream()
-            .map(String::valueOf)
-            .collect(Collectors.joining(" "))
+        orderedNeighborIds: List<int> = [
+            board.map.get(coord.neighbor(i), Cell.NO_CELL).getIndex()
+            for i in range(len(CubeCoord.directions))
+        ]
+        return " ".join(orderedNeighborIds)
     
 
     def resetGameTurnData(self):
         dyingTrees.clear()
         availableSun.clear()
         sentSeeds.clear()
-        for (Player p : gameManager.getPlayers()):
-            availableSun.add(p.getSun())
-            p.reset()
-        
+        for player in gameManager.getPlayers():
+            availableSun.append(player.getSun())
+            player.reset()
         currentFrameType = nextFrameType
     
 
@@ -527,50 +507,43 @@ class Game(metaclass=Singleton):
 
     def _giveSun(self):
         givenToPlayer: List[int] = [None, None]
-        trees.forEach((index, tree) ->:
+
+        for (index, tree) in trees.items():
             if (not shadows.containsKey(index) or shadows.get(index) < tree.getSize()):
-                Player owner = tree.getOwner()
+                owner: Player = tree.getOwner()
                 owner.addSun(tree.getSize())
                 givenToPlayer[owner.getIndex()] += tree.getSize()
             
-        )
-        gameManager.getPlayers().forEach(player ->:
-            int given = givenToPlayer[player.getIndex()]
+        
+        for player in gameManager.getPlayers():
+            given: int = givenToPlayer[player.getIndex()]
             if (given > 0):
                 gameSummaryManager.addGather(player, given)
             
-        )
+        
     
 
     def _removeDyingTrees(self):
-        dyingTrees.forEach(coord ->:
-            Cell cell = board.map.get(coord)
-            int points = nutrients
-            if (cell.getRichness() == Constants.RICHNESS_OK):
+        for coord in dyingTrees:
+            cell: Cell = board.map.get(coord)
+            points: int = nutrients
+            if cell.getRichness() == Constants.RICHNESS_OK:
                 points += Constants.RICHNESS_BONUS_OK
-             else if (cell.getRichness() == Constants.RICHNESS_LUSH):
+             elif cell.getRichness() == Constants.RICHNESS_LUSH:
                 points += Constants.RICHNESS_BONUS_LUSH
             
             player: Player = trees.get(cell.getIndex()).getOwner()
             player.addScore(points)
-            gameManager.addTooltip(
-                player, String.format(
-                    "%s scores %d points",
-                    player.getNicknameToken(),
-                    points
-                )
-            )
+            gameManager.addTooltip(f"{player.getNicknameToken()} scores {points} points")
             trees.remove(cell.getIndex())
             gameSummaryManager.addCutTree(player, cell, points)
-        )
     
-
+    
     def _updateNutrients(self):
-        dyingTrees.forEach(coord ->:
-            nutrients = max(0, nutrients - 1)
-        )
+        # CHECK
+        nutrients = max(0, nutrients - len(dyingTrees))
+        
     
-
     def performGameUpdate(self):
         turn += 1
 
@@ -617,12 +590,12 @@ class Game(metaclass=Singleton):
 
     def performSunGatheringUpdate(self):
         # Wake players
-        gameManager.getPlayers().forEach(p ->:
-            p.setWaiting(False)
-        )
-        trees.forEach((index, tree) ->:
+        for player in gameManager.getPlayers():
+            player.setWaiting(False)
+        
+        for index, tree in trees.items():
             tree.reset()
-        )
+        
         # Harvest
         self._giveSun()
 
@@ -630,61 +603,50 @@ class Game(metaclass=Singleton):
     
 
     def performActionUpdate(self):
-        gameManager.getPlayers()
-            .stream()
-            .filter(p -> !p.isWaiting())
-            .forEach(player ->:
-                try:
-                    Action action = player.getAction()
-                    if (action.isGrow()):
-                        self._doGrow(player, action)
-                    else if (action.isSeed()):
-                        self._doSeed(player, action)
-                    else if (action.isComplete()):
-                        self._doComplete(player, action)
-                    else:
-                        player.setWaiting(True)
-                        gameSummaryManager.addWait(player)
-                    
-                except GameException as e:
-                    gameSummaryManager.addError(player.getNicknameToken() + ": " + e.getMessage())
+
+        for player in [p for p in gameManager.getPlayers() if not p.isWaiting()]:
+            try:
+                action: Action = player.getAction()
+                if action.isGrow():
+                    self._doGrow(player, action)
+                elif action.isSeed():
+                    self._doSeed(player, action)
+                elif action.isComplete():
+                    self._doComplete(player, action)
+                else:
                     player.setWaiting(True)
+                    gameSummaryManager.addWait(player)
                 
-            )
+            except GameException as e:
+                gameSummaryManager.addError(player.getNicknameToken() + ": " + str(e))
+                player.setWaiting(True)
+                
 
         if self._seedsAreConflicting():
             gameSummaryManager.addSeedConflict(sentSeeds.get(0))
-         else:
-            sentSeeds.forEach(seed ->:
-                self._plantSeed(gameManager.getPlayer(seed.getOwner()), seed.getTargetCell(), seed.getSourceCell())
-            )
-            for (player: Player : gameManager.getPlayers()):
-                player.setSun(availableSun.get(player.getIndex()))
+        else:
+            for seed in sentSeeds:
+                self._plantSeed(
+                    gameManager.getPlayer(seed.getOwner()), 
+                    seed.getTargetCell(), 
+                    seed.getSourceCell()
+                )
             
+            for player in gameManager.getPlayers():
+                player.setSun(availableSun.get(player.getIndex()))
         
         self._removeDyingTrees()
-
         self._updateNutrients()
-
         gameManager.setFrameDuration(Constants.DURATION_ACTION_PHASE)
 
     
 
     def _seedsAreConflicting(self) -> bool:
-        return sentSeeds.size() != sentSeeds
-            .stream()
-            .map(seed ->:
-                return seed.getTargetCell()
-            )
-            .distinct()
-            .count()
+        return len(set([seed.getTargetCell() for seed in sentSeeds])) != sentSeeds
     
 
     def _allPlayersAreWaiting(self) -> bool:
-        return gameManager.getPlayers()
-            .stream()
-            .filter(Player::isWaiting)
-            .count() == gameManager.getPlayerCount()
+        return len([player for player in gameManager.getPlayers() if player.isWaiting()]) == gameManager.getPlayerCount()
     
 
     def _plantSeed(self, player: Player, index: int, fatherIndex: int):
@@ -694,7 +656,7 @@ class Game(metaclass=Singleton):
     
 
     def _placeTree(self, player: Player, index: int, size: int) -> Tree:
-        Tree tree = Tree()
+        tree: Tree = Tree()
         tree.setSize(size)
         tree.setOwner(player)
         trees[index] = tree
@@ -702,21 +664,16 @@ class Game(metaclass=Singleton):
     
 
     def onEnd(self):
-        gameManager.getActivePlayers().forEach(
-            player -> player.addScore(int(player.getSun() // 3))
-        )
-        if (
-            gameManager.getActivePlayers().stream()
-                .map(player -> player.getScore())
-                .distinct()
-                .count() == 1
-        ):
-            trees.forEach((index, tree) ->:
-                if (tree.getOwner().isActive()):
+        for player in gameManager.getActivePlayers():
+            player.addScore(int(player.getSun() // 3))
+
+        # if all the player have the same score, add +1 for each tree
+        if len(set([ player.getScore() for player in gameManager.getActivePlayers() ])) == 1:
+
+            for (index, tree) in trees.items():
+                if tree.getOwner().isActive():
                     tree.getOwner().addBonusScore(1)
                     tree.getOwner().addScore(1)
-                
-            )
         
 
     def getBoard(self) -> Dict[CubeCoord, Cell]:
