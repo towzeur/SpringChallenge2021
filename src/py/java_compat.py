@@ -1,5 +1,15 @@
 import time
 
+
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
 class Random:
     """
     Java SE 6 random number generator
@@ -28,13 +38,13 @@ class Random:
         is `bits` bits long, where each bit is nearly equally likely to be 0
         or 1.
         """
-        bits = max(1, min(32, bits)) # clip to 1 - 32
-        self._seed = (self._seed * 0x5DEECE66D + 0xb) & ((1 << 48) - 1)
+        bits = max(1, min(32, bits))  # clip to 1 - 32
+        self._seed = (self._seed * 0x5DEECE66D + 0xB) & ((1 << 48) - 1)
         retval = self._seed >> (48 - bits)
         # Python and Java don't really agree on how ints work. This converts
         # the unsigned generated int into a signed int if necessary.
         if retval & (1 << 31):
-            retval -= (1 << 32)
+            retval -= 1 << 32
         return retval
 
     def nextBytes(self, l):
@@ -51,7 +61,7 @@ class Random:
         if n <= 0:
             raise ValueError("Argument must be positive!")
 
-        if not (n & (n - 1)): # power of two?
+        if not (n & (n - 1)):  # power of two?
             return (n * self.next(31)) >> 31
 
         bits = self.next(31)
@@ -76,4 +86,3 @@ class Random:
 
     def nextGaussian(self):
         raise NotImplementedError
-
