@@ -41,6 +41,7 @@ from Sun import Sun
 from Tree import Tree
 from Cell import Cell
 from FrameType import FrameType
+from Player import Player
 
 class Game(metaclass=Singleton):
 
@@ -154,16 +155,8 @@ class Game(metaclass=Singleton):
         if STARTING_TREES_ON_EDGES:
             startingCoords = self._getBoardEdges()
         else:
-            startingCoords = ArrayList[CubeCoord](board.coords)
-            startingCoords.removeIf(coord ->:
-                return coord.getX() == 0 and coord.getY() == 0 and coord.getZ() == 0
-            )
+            startingCoords = [coord for coord in board.coords if not(coord.getX()==0 and coord.getY()==0 and coord.getZ()==0)]
         
-
-        startingCoords.removeIf(coord ->:
-            Cell cell = board.map.get(coord)
-            return cell.getRichness() == Constants.RICHNESS_NULL
-        )
 
         validCoords: List[CubeCoord] = list()
         while (len(validCoords) < STARTING_TREE_COUNT * 2):
@@ -178,19 +171,17 @@ class Game(metaclass=Singleton):
     
 
     def _tryInitStartingTrees(self, startingCoords: List[CubeCoord]) -> List[CubeCoord]: 
-        coordinates: List[CubeCoord] = ArrayList[CubeCoord]()
-
-        availableCoords: List[CubeCoord] = ArrayList<>(startingCoords)
+        coordinates: List[CubeCoord] = list()
 
         for i in range(STARTING_TREE_COUNT):
  
-            if not availableCoords:
+            if not startingCoords:
                 return coordinates
             
-            r: int = random.nextInt(availableCoords.size())
-            CubeCoord normalCoord = availableCoords.get(r)
-            CubeCoord oppositeCoord = normalCoord.getOpposite()
-            availableCoords.removeIf(coord ->:
+            r: int = random.nextInt(startingCoords.size())
+            normalCoord: CubeCoord = startingCoords.get(r)
+            oppositeCoord: CubeCoord = normalCoord.getOpposite()
+            startingCoords.removeIf(coord ->:
                 return coord.distanceTo(normalCoord) <= STARTING_TREE_DISTANCE or
                     coord.distanceTo(oppositeCoord) <= STARTING_TREE_DISTANCE
             )
@@ -205,17 +196,12 @@ class Game(metaclass=Singleton):
         for index, tree in trees.items(): 
             coord: CubeCoord = board.coords.get(index)
             for i in range(1, tree.getSize()+1):
-            
                 tempCoord: CubeCoord = coord.neighbor(sun.getOrientation(), i)
                 if tempCoord in board.map:
-                    shadows.compute(
-                        board.map[tempCoord].getIndex(),
-                        (key, value) -> value == null ? tree.getSize() : max(value, tree.getSize())
-                    )
-                
-            
-        )
-    
+                    key = board.map[tempCoord].getIndex()
+                    value = max(shadows.get(key, tree.getSize()), tree.getSize())
+                    shadows[key] = value 
+                        
 
     def _getBoardEdges(self) -> List[CubeCoord]:
         centre: CubeCoord = CubeCoord(0, 0, 0)
@@ -224,7 +210,7 @@ class Game(metaclass=Singleton):
     def getCurrentFrameInfoFor(self, player: Player) -> List[str]:
         lines: List[str] = list()
         lines.append(str(round))
-        lines.append(str(nutrients))
+        lines.append(str(nutriments))
 
         #Player information, receiving player first
         other: Player = gameManager.getPlayer(1 - player.getIndex())
@@ -275,59 +261,32 @@ class Game(metaclass=Singleton):
         if player.isWaiting():
             return lines
         
-
         #For each tree, where they can seed.
         #For each tree, if they can grow.
         seedCost: int = self._getSeedCost(player)
-        trees.entrySet()
-            .stream()
-            .filter(e -> e.getValue().getOwner() == player)
-            .forEach(e ->:
-                index: int = e.getKey()
-                Tree tree = e.getValue()
-                CubeCoord coord = board.coords.get(index)
+        for index, tree in [(index, tree) for (index, tree) in trees.items() if tree.getOwner() == player]:
+            coord: CubeCoord = board.coords.get(index)
 
-                if (self._playerCanSeedFrom(player, tree, seedCost)):
-                    for (CubeCoord targetCoord : self._getCoordsInRange(coord, tree.getSize())):
-                        Cell targetCell = board.map.getOrDefault(targetCoord, Cell.NO_CELL)
-                        if self._playerCanSeedTo(targetCell, player):
-                            possibleSeeds.add(
-                                String.format(
-                                    "SEED %d %d",
-                                    index,
-                                    targetCell.getIndex()
-                                )
-                            )
-                        
+            if self._playerCanSeedFrom(player, tree, seedCost):
+                for targetCoord in self._getCoordsInRange(coord, tree.getSize()):
+                    targetCell: Cell = board.map.get(targetCoord, Cell.NO_CELL)
+                    if self._playerCanSeedTo(targetCell, player):
+                        possibleSeeds.append(f"SEED {index} {targetCell.getIndex()}")
                     
                 
-
-                int growCost = self._getGrowthCost(tree)
-                if (growCost <= player.getSun() and !tree.isDormant()):
-                    if (tree.getSize() == Constants.TREE_TALL):
-                        possibleCompletes.add(
-                            String.format(
-                                "COMPLETE %d",
-                                index
-                            )
-                        )
-                     elif (ENABLE_GROW):
-                        possibleGrows.add(
-                            String.format(
-                                "GROW %d",
-                                index
-                            )
-                        )
-                    
+            growCost: int = self._getGrowthCost(tree)
+            if growCost <= player.getSun() and not tree.isDormant():
+                if tree.getSize() == Constants.TREE_TALL:
+                    possibleCompletes.append(f"COMPLETE {index}")
+                elif ENABLE_GROW:
+                    possibleGrows.append(f"GROW {index}")
                 
-            )
 
-        Stream.of(possibleCompletes, possibleGrows, possibleSeeds)
-            .forEach(possibleList ->:
-                Collections.shuffle(possibleList, random)
-                lines.addAll(possibleList)
-            )
-
+        for possibleList in (possibleCompletes, possibleGrows, possibleSeeds):
+            Collections.shuffle(possibleList, random)
+            # CHECK
+            lines.extend(possibleList)
+            
         return lines
     
 
@@ -348,7 +307,7 @@ class Game(metaclass=Singleton):
         lines: List[str] = list()
         lines.append(str(len(board.coords)))
 
-        for coord: CubeCoord in board.coords:
+        for coord in board.coords:
             cell: Cell = board.map[coord]
             lines.append(f"{cell.getIndex()} {cell.getRichness()} {self._getNeighbourIds(coord)}")
         
