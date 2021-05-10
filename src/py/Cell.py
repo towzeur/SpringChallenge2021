@@ -21,3 +21,4 @@ class Cell:
 
 
 Cell.NO_CELL = Cell(-1, valid=False)
+# https://stackoverflow.com/questions/40244413/python-static-class-attribute-of-the-class-itself
