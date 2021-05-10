@@ -15,15 +15,15 @@ from java_compat import Singleton
 class CommandManager(metaclass=Singleton):
     gameSummaryManager: GameSummaryManager = GameSummaryManager()
 
-    PLAYER_WAIT_PATTERN: re.Pattern = re.compile("^WAIT(?:\\s+(?<message>.*))?")
+    PLAYER_WAIT_PATTERN: re.Pattern = re.compile(r"^WAIT(?:\s+(?P<message>.*))?")
     PLAYER_SEED_PATTERN: re.Pattern = re.compile(
-        "^SEED (?<sourceId>\\d+) (?<targetId>\\d+)(?:\\s+(?<message>.*))?"
+        r"^SEED (?P<sourceId>\d+) (?P<targetId>\d+)(?:\s+(?P<message>.*))?"
     )
     PLAYER_GROW_PATTERN: re.Pattern = re.compile(
-        "^GROW (?<targetId>\\d+)(?:\\s+(?<message>.*))?"
+        r"^GROW (?P<targetId>\d+)(?:\s+(?P<message>.*))?"
     )
     PLAYER_COMPLETE_PATTERN: re.Pattern = re.compile(
-        "^COMPLETE (?<targetId>\\d+)(?:\\s+(?<message>.*))?"
+        r"^COMPLETE (?P<targetId>\d+)(?:\s+(?P<message>.*))?"
     )
 
     def parseCommands(self, player: Player, lines: List[str], game: Game):
