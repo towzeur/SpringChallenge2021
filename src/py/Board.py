@@ -1,22 +1,18 @@
 from typing import List, Dict
 
-from CubeCoord import CubeCoord
-from Cell import Cell
-
-# import java.util.List;
-# import java.util.Map;
-# import java.util.Map.Entry;
-# import java.util.stream.Collectors;
+import py.cube_coord
+import py.cell
 
 
 class Board:
-    def __init__(self, map: Dict[CubeCoord, Cell]):
-        self.map: Dict[CubeCoord, Cell] = map
+    def __init__(self, map: Dict[py.cube_coord.CubeCoord, py.cell.Cell]):
 
-        self.coords: List[CubeCoord] = [
+        self.map: Dict[py.cube_coord.CubeCoord, py.cell.Cell] = map
+
+        self.coords: List[py.cube_coord.CubeCoord] = [
             cubecoord
-            for cubecoord, cell in sorted(
+            for (cubecoord, cell) in sorted(
                 [(cubecoord, cell) for (cubecoord, cell) in map.items()],
-                key=lambda cubecoord, cell: cell.getIndex(),
+                key=lambda item: item[1].getIndex(),
             )
         ]

@@ -1,6 +1,6 @@
 from typing import Callable, Any
 
-from java_compat import Properties
+from py.java.compat import Properties
 
 
 class Config:

@@ -1,19 +1,20 @@
 from typing import List
 import re
 
-# import com.google.inject.Inject
-from action import CompleteAction, GrowAction, SeedAction, WaitAction
+from py.action import CompleteAction, GrowAction, SeedAction, WaitAction
 
-from Player import Player
-from Game import Game
-from InvalidInputException import InvalidInputException
-from GameSummaryManager import GameSummaryManager
+import py.player
+import py.game
+import py.invalid_input_exception
+import py.game_summary_manager
 
-from java_compat import Singleton
+from py.java.compat import Singleton
 
 
 class CommandManager(metaclass=Singleton):
-    gameSummaryManager: GameSummaryManager = GameSummaryManager()
+    gameSummaryManager: py.game_summary_manager.GameSummaryManager = (
+        py.game_summary_manager.GameSummaryManager()
+    )
 
     PLAYER_WAIT_PATTERN: re.Pattern = re.compile(r"^WAIT(?:\s+(?P<message>.*))?")
     PLAYER_SEED_PATTERN: re.Pattern = re.compile(
@@ -26,7 +27,9 @@ class CommandManager(metaclass=Singleton):
         r"^COMPLETE (?P<targetId>\d+)(?:\s+(?P<message>.*))?"
     )
 
-    def parseCommands(self, player: Player, lines: List[str], game: Game):
+    def parseCommands(
+        self, player: py.player.Player, lines: List[str], game: py.game.Game
+    ):
         command: str = lines[0]
 
         if player.isWaiting():
@@ -43,7 +46,7 @@ class CommandManager(metaclass=Singleton):
                 return
 
             # -- GROW --
-            if Game.ENABLE_GROW:
+            if py.game.Game.ENABLE_GROW:
                 match = CommandManager.PLAYER_GROW_PATTERN.match(command)
                 if match:
                     targetId: int = int(match.group("targetId"))
@@ -60,7 +63,7 @@ class CommandManager(metaclass=Singleton):
                 return
 
             # -- SEED --
-            if Game.ENABLE_SEED:
+            if py.game.Game.ENABLE_SEED:
                 match = CommandManager.PLAYER_SEED_PATTERN.matcher(command)
                 if match:
                     sourceId: int = int(match.group("sourceId"))
@@ -69,16 +72,20 @@ class CommandManager(metaclass=Singleton):
                     self._matchMessage(player, match)
                     return
 
-            raise InvalidInputException(Game.getExpected(), command)
+            raise py.invalid_input_exception.InvalidInputException(
+                py.game.Game.getExpected(), command
+            )
 
-        except InvalidInputException as e:
+        except py.invalid_input_exception.InvalidInputException as e:
             self.deactivatePlayer(player, str(e))
             CommandManager.gameSummaryManager.addPlayerBadCommand(player, e)
             CommandManager.gameSummaryManager.addPlayerDisqualified(player)
 
         except Exception as e:
-            invalidInputException: InvalidInputException = InvalidInputException(
-                Game.getExpected(), str(e)
+            invalidInputException: py.invalid_input_exception.InvalidInputException = (
+                py.invalid_input_exception.InvalidInputException(
+                    py.game.Game.getExpected(), str(e)
+                )
             )
             self.deactivatePlayer(player, str(invalidInputException))
             CommandManager.gameSummaryManager.addPlayerBadCommand(
@@ -86,14 +93,14 @@ class CommandManager(metaclass=Singleton):
             )
             CommandManager.gameSummaryManager.addPlayerDisqualified(player)
 
-    def deactivatePlayer(self, player: Player, message: str):
+    def deactivatePlayer(self, player: py.player.Player, message: str):
         player.deactivate(self._escapeHTMLEntities(message))
         player.setScore(-1)
 
     def _escapeHTMLEntities(self, message: str) -> str:
         return message.replace("&lt", "<").replace("&gt", ">")
 
-    def _matchMessage(self, player: Player, match: re.Match):
+    def _matchMessage(self, player: py.player.Player, match: re.Match):
         message: str = match.group("message")
         if message:
             trimmed: str = message.strip()

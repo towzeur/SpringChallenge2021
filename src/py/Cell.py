@@ -19,6 +19,12 @@ class Cell:
     def getRichness(self) -> int:
         return self._richness
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __str__(self):
+        return f"Cell(index={self._index}, richness={self._richness})"
+
 
 Cell.NO_CELL = Cell(-1, valid=False)
 # https://stackoverflow.com/questions/40244413/python-static-class-attribute-of-the-class-itself

@@ -1,8 +1,3 @@
-# package com.codingame.game;
-
-# import com.codingame.view.Serializer;
-
-
 class CubeCoord:
 
     directions = (
@@ -67,3 +62,9 @@ class CubeCoord:
 
     def getOpposite(self) -> "CubeCoord":
         return CubeCoord(-self.x, -self.y, -self.z)
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __str__(self):
+        return f"CubeCoord(x={self.x}, y={self.y}, z={self.z})"

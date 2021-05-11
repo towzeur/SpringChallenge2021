@@ -1,50 +1,37 @@
-# import java.util.ArrayList
-# import java.util.Collections
-# import java.util.HashMap
-# import java.util.List
-# import java.util.Map
-# import java.util.Random
-# import java.util.TreeMap
-# import java.util.stream.Collectors
-# import java.util.stream.Stream
-
 import sys
 from typing import List, Dict
 
-from action.Action import Action
+from py.exception.AlreadyActivatedTree import AlreadyActivatedTree
+from py.exception.CellNotEmptyException import CellNotEmptyException
+from py.exception.CellNotFoundException import CellNotFoundException
+from py.exception.CellNotValidException import CellNotValidException
+from py.exception.GameException import GameException
+from py.exception.NotEnoughSunException import NotEnoughSunException
+from py.exception.NotOwnerOfTreeException import NotOwnerOfTreeException
+from py.exception.TreeAlreadyTallException import TreeAlreadyTallException
+from py.exception.TreeIsSeedException import TreeIsSeedException
+from py.exception.TreeNotFoundException import TreeNotFoundException
+from py.exception.TreeNotTallException import TreeNotTallException
+from py.exception.TreeTooFarException import TreeTooFarException
 
-from exception.AlreadyActivatedTree import AlreadyActivatedTree
-from exception.CellNotEmptyException import CellNotEmptyException
-from exception.CellNotFoundException import CellNotFoundException
-from exception.CellNotValidException import CellNotValidException
-from exception.GameException import GameException
-from exception.NotEnoughSunException import NotEnoughSunException
-from exception.NotOwnerOfTreeException import NotOwnerOfTreeException
-from exception.TreeAlreadyTallException import TreeAlreadyTallException
-from exception.TreeIsSeedException import TreeIsSeedException
-from exception.TreeNotFoundException import TreeNotFoundException
-from exception.TreeNotTallException import TreeNotTallException
-from exception.TreeTooFarException import TreeTooFarException
+from py.action.Action import Action
 
-import com.codingame.gameengine.core.MultiplayerGameManager
-
-# import com.google.inject.Inject
-# import com.google.inject.Singleton
-from java_compat import Singleton, Random, Collections
-
-from Board import Board
-from BoardGenerator import BoardGenerator
-from Constants import Constants
-from Config import Config
-from CubeCoord import CubeCoord
-from Seed import Seed
-from Sun import Sun
-from Tree import Tree
-from Cell import Cell
-from FrameType import FrameType
-from Player import Player
-from GameSummaryManager import GameSummaryManager
 from py.codingame import MultiplayerGameManager
+
+from py.java.compat import Singleton, Random, Collections
+
+import py.board
+import py.board_generator
+import py.constants
+import py.config
+import py.cube_coord
+import py.seed
+import py.sun
+import py.tree
+import py.cell
+import py.frame_type
+import py.player
+import py.game_summary_manager
 
 
 class Game(metaclass=Singleton):
@@ -62,24 +49,26 @@ class Game(metaclass=Singleton):
     def __init__(self):
         # public
         self.nutrients: int = None
-        self.board: Board = None
-        self.trees: Dict[int, Tree] = None
-        self.dyingTrees: List[CubeCoord] = None
+        self.board: py.board.Board = None
+        self.trees: Dict[int, py.tree.Tree] = None
+        self.dyingTrees: List[py.cube_coord.CubeCoord] = None
         self.availableSun: List[int] = None
-        self.sentSeeds: List[Seed] = None
-        self.sun: Sun = None
+        self.sentSeeds: List[py.seed.Seed] = None
+        self.sun: py.sun.Sun = None
         self.shadows: Dict[int, int] = None
-        self.cells: List[Cell] = None
+        self.cells: List[py.cell.Cell] = None
         self.random: Random = None
         self.round: int = None
         self.turn: int = None
-        self.currentFrameType: FrameType = None
-        self.nextFrameType: FrameType = None
+        self.currentFrameType: py.frame_type.FrameType = None
+        self.nextFrameType: py.frame_type.FrameType = None
 
         # private
-        # self._gameManager: MultiplayerGameManager<Player> = None #@Inject private
+        # self._gameManager: MultiplayerGameManager<py.player.Player> = None #@Inject private
         self._gameManager: MultiplayerGameManager = None  # @Inject private
-        self._gameSummaryManager: GameSummaryManager = None  # @Inject private
+        self._gameSummaryManager: py.game_summary_manager.GameSummaryManager = (
+            None  # @Inject private
+        )
 
     def init(self, seed: int):
 
@@ -91,7 +80,7 @@ class Game(metaclass=Singleton):
             Game.ENABLE_SHADOW = False
             Game.ENABLE_HOLES = False
             Game.STARTING_TREE_COUNT = 6
-            Game.STARTING_TREE_SIZE = Constants.TREE_TALL
+            Game.STARTING_TREE_SIZE = py.constants.Constants.TREE_TALL
             Game.STARTING_TREE_DISTANCE = 0
             Game.STARTING_TREES_ON_EDGES = False
 
@@ -103,37 +92,37 @@ class Game(metaclass=Singleton):
             Game.ENABLE_SHADOW = False
             Game.ENABLE_HOLES = False
             Game.STARTING_TREE_COUNT = 4
-            Game.STARTING_TREE_SIZE = Constants.TREE_SMALL
+            Game.STARTING_TREE_SIZE = py.constants.Constants.TREE_SMALL
             Game.STARTING_TREE_DISTANCE = 1
             Game.STARTING_TREES_ON_EDGES = False
 
         else:
             # Bronze+
-            Game.MAX_ROUNDS = Config.Game.MAX_ROUNDS
+            Game.MAX_ROUNDS = py.config.Config.Game.MAX_ROUNDS
             Game.ENABLE_SEED = True
             Game.ENABLE_GROW = True
             Game.ENABLE_SHADOW = True
             Game.ENABLE_HOLES = True
-            Game.STARTING_TREE_COUNT = Constants.Game.STARTING_TREE_COUNT
-            Game.STARTING_TREE_SIZE = Constants.TREE_SMALL
+            Game.STARTING_TREE_COUNT = py.constants.Constants.Game.STARTING_TREE_COUNT
+            Game.STARTING_TREE_SIZE = py.constants.Constants.TREE_SMALL
             Game.STARTING_TREE_DISTANCE = 2
             Game.STARTING_TREES_ON_EDGES = True
 
-        self.nutrients = Config.STARTING_NUTRIENTS
-        self.board = BoardGenerator.generate(self.random)
+        self.nutrients = py.config.Config.STARTING_NUTRIENTS
+        self.board = py.board_generator.BoardGenerator.generate(self.random)
         self.trees = dict()  # TreeMap<>()
         self.dyingTrees = list()
         # ArrayList<>(self._gameManager.getPlayerCount()) # CHECK
         self.availableSun = list()
         self.sentSeeds = list()
-        self.sun = Sun()
+        self.sun = py.sun.Sun()
         self.shadows = dict()
         self.cells = list()
         self.random = Random(seed)
         self.round = 0
         self.turn = 0
-        self.currentFrameType = FrameType.INIT
-        self.nextFrameType = FrameType.GATHERING
+        self.currentFrameType = py.frame_type.FrameType.INIT
+        self.nextFrameType = py.frame_type.FrameType.GATHERING
 
         self.initStartingTrees()
         self.sun.setOrientation(0)
@@ -150,7 +139,7 @@ class Game(metaclass=Singleton):
 
         return "SEED <from> <to> | GROW <idx> | COMPLETE <idx> | WAIT"
 
-    def _getCoordByIndex(self, index: int) -> CubeCoord:
+    def _getCoordByIndex(self, index: int) -> py.cube_coord.CubeCoord:
         for cubecoord, cell in self.board.map.items():
             if cell.getIndex() == index:
                 return cubecoord
@@ -158,7 +147,7 @@ class Game(metaclass=Singleton):
 
     def initStartingTrees(self):
 
-        startingCoords: List[CubeCoord] = list()
+        startingCoords: List[py.cube_coord.CubeCoord] = list()
         if Game.STARTING_TREES_ON_EDGES:
             startingCoords = self._getBoardEdges()
         else:
@@ -169,14 +158,15 @@ class Game(metaclass=Singleton):
         startingCoords = [
             coord
             for coord in self.board.coords
-            if self.board.map[coord].getRichness() != Constants.RICHNESS_NULL
+            if self.board.map[coord].getRichness()
+            != py.constants.Constants.RICHNESS_NULL
         ]
 
-        validCoords: List[CubeCoord] = list()
+        validCoords: List[py.cube_coord.CubeCoord] = list()
         while len(validCoords) < Game.STARTING_TREE_COUNT * 2:
             validCoords = self._tryInitStartingTrees(startingCoords)
 
-        players: List[Player] = self._gameManager.getPlayers()
+        players: List[py.player.Player] = self._gameManager.getPlayers()
         for i in range(Game.STARTING_TREE_COUNT):
             self._placeTree(
                 players[0],
@@ -189,14 +179,16 @@ class Game(metaclass=Singleton):
                 Game.STARTING_TREE_SIZE,
             )
 
-    def _tryInitStartingTrees(self, startingCoords: List[CubeCoord]) -> List[CubeCoord]:
-        coordinates: List[CubeCoord] = list()
+    def _tryInitStartingTrees(
+        self, startingCoords: List[py.cube_coord.CubeCoord]
+    ) -> List[py.cube_coord.CubeCoord]:
+        coordinates: List[py.cube_coord.CubeCoord] = list()
         for i in range(Game.STARTING_TREE_COUNT):
             if not startingCoords:
                 return coordinates
             r: int = self.random.nextInt(len(startingCoords))
-            normalCoord: CubeCoord = startingCoords[r]
-            oppositeCoord: CubeCoord = normalCoord.getOpposite()
+            normalCoord: py.cube_coord.CubeCoord = startingCoords[r]
+            oppositeCoord: py.cube_coord.CubeCoord = normalCoord.getOpposite()
             startingCoords = [
                 coord
                 for coord in startingCoords
@@ -212,9 +204,11 @@ class Game(metaclass=Singleton):
     def _calculateShadows(self):
         self.shadows.clear()
         for index, tree in self.trees.items():
-            coord: CubeCoord = self.board.coords[index]
+            coord: py.cube_coord.CubeCoord = self.board.coords[index]
             for i in range(1, tree.getSize() + 1):
-                tempCoord: CubeCoord = coord.neighbor(self.sun.getOrientation(), i)
+                tempCoord: py.cube_coord.CubeCoord = coord.neighbor(
+                    self.sun.getOrientation(), i
+                )
                 if tempCoord in self.board.map:
                     key: int = self.board.map[tempCoord].getIndex()
                     value: int = max(
@@ -222,20 +216,20 @@ class Game(metaclass=Singleton):
                     )  # CHECK
                     self.shadows[key] = value
 
-    def _getBoardEdges(self) -> List[CubeCoord]:
+    def _getBoardEdges(self) -> List[py.cube_coord.CubeCoord]:
         return [
             coord
             for coord in self.board.coords
-            if coord.norm() == Config.MAP_RING_COUNT
+            if coord.norm() == py.config.Config.MAP_RING_COUNT
         ]
 
-    def getCurrentFrameInfoFor(self, player: Player) -> List[str]:
+    def getCurrentFrameInfoFor(self, player: py.player.Player) -> List[str]:
         lines: List[str] = list()
         lines.append(str(self.round))
         lines.append(str(self.nutrients))
 
-        # Player information, receiving player first
-        other: Player = self._gameManager.getPlayer(1 - player.getIndex())
+        # py.player.Player information, receiving player first
+        other: py.player.Player = self._gameManager.getPlayer(1 - player.getIndex())
         lines.append(f"{player.getSun()} {player.getScore()}")
         lines.append(
             f"{other.getSun()} {other.getScore()} {1 if other.isWaiting() else 0}"
@@ -259,15 +253,21 @@ class Game(metaclass=Singleton):
 
         return lines
 
-    def _getCoordsInRange(self, center: CubeCoord, N: int) -> List[CubeCoord]:
-        results: List[CubeCoord] = list()
+    def _getCoordsInRange(
+        self, center: py.cube_coord.CubeCoord, N: int
+    ) -> List[py.cube_coord.CubeCoord]:
+        results: List[py.cube_coord.CubeCoord] = list()
         for x in range(-N, N + 1):
             for y in range(max(-N, -x - N), min(+N, -x + N) + 1):
                 z: int = -x - y
-                results.append(CubeCoord.cubeAdd(center, CubeCoord(x, y, z)))
+                results.append(
+                    py.cube_coord.CubeCoord.cubeAdd(
+                        center, py.cube_coord.CubeCoord(x, y, z)
+                    )
+                )
         return results
 
-    def _getPossibleMoves(self, player: Player) -> List[str]:
+    def _getPossibleMoves(self, player: py.player.Player) -> List[str]:
         lines: List[str] = list()
         lines.append("WAIT")
 
@@ -286,17 +286,19 @@ class Game(metaclass=Singleton):
             for (index, tree) in self.trees.items()
             if tree.getOwner() == player
         ]:
-            coord: CubeCoord = self.board.coords.get(index)
+            coord: py.cube_coord.CubeCoord = self.board.coords.get(index)
 
             if self._playerCanSeedFrom(player, tree, seedCost):
                 for targetCoord in self._getCoordsInRange(coord, tree.getSize()):
-                    targetCell: Cell = self.board.map.get(targetCoord, Cell.NO_CELL)
+                    targetCell: py.cell.Cell = self.board.map.get(
+                        targetCoord, py.cell.Cell.NO_CELL
+                    )
                     if self._playerCanSeedTo(targetCell, player):
                         possibleSeeds.append(f"SEED {index} {targetCell.getIndex()}")
 
             growCost: int = self._getGrowthCost(tree)
             if growCost <= player.getSun() and not tree.isDormant():
-                if tree.getSize() == Constants.TREE_TALL:
+                if tree.getSize() == py.constants.Constants.TREE_TALL:
                     possibleCompletes.append(f"COMPLETE {index}")
                 elif Game.ENABLE_GROW:
                     possibleGrows.append(f"GROW {index}")
@@ -308,37 +310,41 @@ class Game(metaclass=Singleton):
 
         return lines
 
-    def _playerCanSeedFrom(self, player: Player, tree: Tree, seedCost: int) -> bool:
+    def _playerCanSeedFrom(
+        self, player: py.player.Player, tree: py.tree.Tree, seedCost: int
+    ) -> bool:
         return (
             Game.ENABLE_SEED
             and (seedCost <= player.getSun())
-            and (tree.getSize() > Constants.TREE_SEED)
+            and (tree.getSize() > py.constants.Constants.TREE_SEED)
             and (not tree.isDormant())
         )
 
-    def playerCanSeedTo(self, targetCell: Cell, player: Player) -> bool:
+    def playerCanSeedTo(
+        self, targetCell: py.cell.Cell, player: py.player.Player
+    ) -> bool:
         return (
             targetCell.isValid()
-            and (targetCell.getRichness() != Constants.RICHNESS_NULL)
+            and (targetCell.getRichness() != py.constants.Constants.RICHNESS_NULL)
             and (targetCell.getIndex() not in self.trees)
         )
 
-    def getGlobalInfoFor(self, player: Player) -> List[str]:
+    def getGlobalInfoFor(self, player: py.player.Player) -> List[str]:
         lines: List[str] = list()
         lines.append(str(len(self.board.coords)))
 
         for coord in self.board.coords:
-            cell: Cell = self.board.map[coord]
+            cell: py.cell.Cell = self.board.map[coord]
             lines.append(
                 f"{cell.getIndex()} {cell.getRichness()} {self._getNeighbourIds(coord)}"
             )
 
         return lines
 
-    def getNeighbourIds(self, coord: CubeCoord) -> str:
+    def getNeighbourIds(self, coord: py.cube_coord.CubeCoord) -> str:
         orderedNeighborIds: List[int] = [
-            self.board.map.get(coord.neighbor(i), Cell.NO_CELL).getIndex()
-            for i in range(len(CubeCoord.directions))
+            self.board.map.get(coord.neighbor(i), py.cell.Cell.NO_CELL).getIndex()
+            for i in range(len(py.cube_coord.CubeCoord.directions))
         ]
         return " ".join(orderedNeighborIds)
 
@@ -351,19 +357,19 @@ class Game(metaclass=Singleton):
             player.reset()
         self.currentFrameType = self.nextFrameType
 
-    def _getGrowthCost(self, targetTree: Tree) -> int:
+    def _getGrowthCost(self, targetTree: py.tree.Tree) -> int:
         targetSize: int = targetTree.getSize() + 1
-        if targetSize > Constants.TREE_TALL:
-            return Constants.LIFECYCLE_END_COST
+        if targetSize > py.constants.Constants.TREE_TALL:
+            return py.constants.Constants.LIFECYCLE_END_COST
         return self._getCostFor(targetSize, targetTree.getOwner())
 
-    def _getSeedCost(self, player: Player) -> int:
+    def _getSeedCost(self, player: py.player.Player) -> int:
         return self._getCostFor(0, player)
 
-    def _doGrow(self, player: Player, action: Action):
-        coord: CubeCoord = self._getCoordByIndex(action.getTargetId())
-        cell: Cell = self.board.map.get(coord)
-        targetTree: Tree = self.trees.get(cell.getIndex())
+    def _doGrow(self, player: py.player.Player, action: Action):
+        coord: py.cube_coord.CubeCoord = self._getCoordByIndex(action.getTargetId())
+        cell: py.cell.Cell = self.board.map.get(coord)
+        targetTree: py.tree.Tree = self.trees.get(cell.getIndex())
 
         if targetTree is None:
             raise TreeNotFoundException(cell.getIndex())
@@ -374,7 +380,7 @@ class Game(metaclass=Singleton):
         if targetTree.isDormant():
             raise AlreadyActivatedTree(cell.getIndex())
 
-        if targetTree.getSize() >= Constants.TREE_TALL:
+        if targetTree.getSize() >= py.constants.Constants.TREE_TALL:
             raise TreeAlreadyTallException(cell.getIndex())
 
         costOfGrowth: int = self._getGrowthCost(targetTree)
@@ -389,17 +395,17 @@ class Game(metaclass=Singleton):
 
         targetTree.setDormant()
 
-    def _doComplete(self, player: Player, action: Action):
-        coord: CubeCoord = self._getCoordByIndex(action.getTargetId())
-        cell: Cell = self.board.map[coord]
-        targetTree: Tree = self.trees.get(cell.getIndex(), None)
+    def _doComplete(self, player: py.player.Player, action: Action):
+        coord: py.cube_coord.CubeCoord = self._getCoordByIndex(action.getTargetId())
+        cell: py.cell.Cell = self.board.map[coord]
+        targetTree: py.tree.Tree = self.trees.get(cell.getIndex(), None)
         if targetTree is None:
             raise TreeNotFoundException(cell.getIndex())
 
         if targetTree.getOwner() != player:
             raise NotOwnerOfTreeException(cell.getIndex(), targetTree.getOwner())
 
-        if targetTree.getSize() < Constants.TREE_TALL:
+        if targetTree.getSize() < py.constants.Constants.TREE_TALL:
             raise TreeNotTallException(cell.getIndex())
 
         if targetTree.isDormant():
@@ -414,8 +420,8 @@ class Game(metaclass=Singleton):
         self.dyingTrees.append(coord)
         targetTree.setDormant()
 
-    def _getCostFor(self, size: int, owner: Player) -> int:
-        baseCost: int = Constants.TREE_BASE_COST[size]
+    def _getCostFor(self, size: int, owner: py.player.Player) -> int:
+        baseCost: int = py.constants.Constants.TREE_BASE_COST[size]
         sameTreeCount: int = len(
             [
                 t
@@ -425,20 +431,24 @@ class Game(metaclass=Singleton):
         )  # CHECK
         return baseCost + sameTreeCount
 
-    def _doSeed(self, player: Player, action: Action):
-        targetCoord: CubeCoord = self._getCoordByIndex(action.getTargetId())
-        sourceCoord: CubeCoord = self._getCoordByIndex(action.getSourceId())
+    def _doSeed(self, player: py.player.Player, action: Action):
+        targetCoord: py.cube_coord.CubeCoord = self._getCoordByIndex(
+            action.getTargetId()
+        )
+        sourceCoord: py.cube_coord.CubeCoord = self._getCoordByIndex(
+            action.getSourceId()
+        )
 
-        targetCell: Cell = self.board.map[targetCoord]
-        sourceCell: Cell = self.board.map[sourceCoord]
+        targetCell: py.cell.Cell = self.board.map[targetCoord]
+        sourceCell: py.cell.Cell = self.board.map[sourceCoord]
 
         # check if the move is possible
         if self._aTreeIsOn(targetCell):
             raise CellNotEmptyException(targetCell.getIndex())
-        sourceTree: Tree = self.trees.get(sourceCell.getIndex(), None)
+        sourceTree: py.tree.Tree = self.trees.get(sourceCell.getIndex(), None)
         if sourceTree is None:
             raise TreeNotFoundException(sourceCell.getIndex())
-        if sourceTree.getSize() == Constants.TREE_SEED:
+        if sourceTree.getSize() == py.constants.Constants.TREE_SEED:
             raise TreeIsSeedException(sourceCell.getIndex())
         if sourceTree.getOwner() != player:
             raise NotOwnerOfTreeException(sourceCell.getIndex(), sourceTree.getOwner())
@@ -447,7 +457,7 @@ class Game(metaclass=Singleton):
         distance: int = sourceCoord.distanceTo(targetCoord)
         if distance > sourceTree.getSize():
             raise TreeTooFarException(sourceCell.getIndex(), targetCell.getIndex())
-        if targetCell.getRichness() == Constants.RICHNESS_NULL:
+        if targetCell.getRichness() == py.constants.Constants.RICHNESS_NULL:
             raise CellNotValidException(targetCell.getIndex())
         costOfSeed: int = self._getSeedCost(player)
         currentSun: int = self.availableSun[player.getIndex()]
@@ -457,14 +467,14 @@ class Game(metaclass=Singleton):
         # the seed action is valid : do it
         self.availableSun[player.getIndex()] = currentSun - costOfSeed
         sourceTree.setDormant()
-        seed: Seed = Seed()
+        seed: py.seed.Seed = py.seed.Seed()
         seed.setOwner(player.getIndex())
         seed.setSourceCell(sourceCell.getIndex())
         seed.setTargetCell(targetCell.getIndex())
         self.sentSeeds.append(seed)
         self._gameSummaryManager.addPlantSeed(player, targetCell, sourceCell)
 
-    def _aTreeIsOn(self, cell: Cell) -> bool:
+    def _aTreeIsOn(self, cell: py.cell.Cell) -> bool:
         return cell.getIndex() in self.trees
 
     def _giveSun(self):
@@ -474,7 +484,7 @@ class Game(metaclass=Singleton):
             if (index not in self.shadows) or (
                 self.shadows[index] < tree.getSize()
             ):  # CHECK
-                owner: Player = tree.getOwner()
+                owner: py.player.Player = tree.getOwner()
                 owner.addSun(tree.getSize())
                 givenToPlayer[owner.getIndex()] += tree.getSize()
 
@@ -485,14 +495,14 @@ class Game(metaclass=Singleton):
 
     def _removeDyingTrees(self):
         for coord in self.dyingTrees:
-            cell: Cell = self.board.map.get(coord)
+            cell: py.cell.Cell = self.board.map.get(coord)
             points: int = self.nutrients
-            if cell.getRichness() == Constants.RICHNESS_OK:
-                points += Constants.RICHNESS_BONUS_OK
-            elif cell.getRichness() == Constants.RICHNESS_LUSH:
-                points += Constants.RICHNESS_BONUS_LUSH
+            if cell.getRichness() == py.constants.Constants.RICHNESS_OK:
+                points += py.constants.Constants.RICHNESS_BONUS_OK
+            elif cell.getRichness() == py.constants.Constants.RICHNESS_LUSH:
+                points += py.constants.Constants.RICHNESS_BONUS_LUSH
 
-            player: Player = self.trees[cell.getIndex()].getOwner()
+            player: py.player.Player = self.trees[cell.getIndex()].getOwner()
             player.addScore(points)
             self._gameManager.addTooltip(
                 f"{player.getNicknameToken()} scores {points} points"
@@ -508,21 +518,21 @@ class Game(metaclass=Singleton):
     def performGameUpdate(self):
         self.turn += 1
 
-        if self.currentFrameType == FrameType.GATHERING:
+        if self.currentFrameType == py.frame_type.FrameType.GATHERING:
             self._gameSummaryManager.addRound(self.round)
             self.performSunGatheringUpdate()
-            self.nextFrameType = FrameType.ACTIONS
+            self.nextFrameType = py.frame_type.FrameType.ACTIONS
 
-        elif self.currentFrameType == FrameType.ACTIONS:
+        elif self.currentFrameType == py.frame_type.FrameType.ACTIONS:
             self._gameSummaryManager.addRound(self.round)
             self.performActionUpdate()
             if self._allPlayersAreWaiting():
-                self.nextFrameType = FrameType.SUN_MOVE
+                self.nextFrameType = py.frame_type.FrameType.SUN_MOVE
 
-        elif self.currentFrameType == FrameType.SUN_MOVE:
+        elif self.currentFrameType == py.frame_type.FrameType.SUN_MOVE:
             self._gameSummaryManager.addRoundTransition(self.round)
             self.performSunMoveUpdate()
-            self.nextFrameType = FrameType.GATHERING
+            self.nextFrameType = py.frame_type.FrameType.GATHERING
 
         else:
             print(f"Error: {self.currentFrameType}", file=sys.stderr)
@@ -542,7 +552,9 @@ class Game(metaclass=Singleton):
             if Game.ENABLE_SHADOW:
                 self._calculateShadows()
 
-        self._gameManager.setFrameDuration(Constants.DURATION_SUNMOVE_PHASE)
+        self._gameManager.setFrameDuration(
+            py.constants.Constants.DURATION_SUNMOVE_PHASE
+        )
 
     def performSunGatheringUpdate(self):
         # Wake players
@@ -555,7 +567,7 @@ class Game(metaclass=Singleton):
         # Harvest
         self._giveSun()
 
-        self._gameManager.setFrameDuration(Constants.DURATION_GATHER_PHASE)
+        self._gameManager.setFrameDuration(py.constants.Constants.DURATION_GATHER_PHASE)
 
     def performActionUpdate(self):
 
@@ -593,7 +605,7 @@ class Game(metaclass=Singleton):
 
         self._removeDyingTrees()
         self._updateNutrients()
-        self._gameManager.setFrameDuration(Constants.DURATION_ACTION_PHASE)
+        self._gameManager.setFrameDuration(py.constants.Constants.DURATION_ACTION_PHASE)
 
     def _seedsAreConflicting(self) -> bool:
         return len(set([seed.getTargetCell() for seed in self.sentSeeds])) != len(
@@ -612,13 +624,17 @@ class Game(metaclass=Singleton):
             == self._gameManager.getPlayerCount()
         )
 
-    def _plantSeed(self, player: Player, index: int, fatherIndex: int):
-        seed: Tree = self._placeTree(player, index, Constants.TREE_SEED)
+    def _plantSeed(self, player: py.player.Player, index: int, fatherIndex: int):
+        seed: py.tree.Tree = self._placeTree(
+            player, index, py.constants.Constants.TREE_SEED
+        )
         seed.setDormant()
         seed.setFatherIndex(fatherIndex)
 
-    def _placeTree(self, player: Player, index: int, size: int) -> Tree:
-        tree: Tree = Tree()
+    def _placeTree(
+        self, player: py.player.Player, index: int, size: int
+    ) -> py.tree.Tree:
+        tree: py.tree.Tree = py.tree.Tree()
         tree.setSize(size)
         tree.setOwner(player)
         self.trees[index] = tree
@@ -646,10 +662,10 @@ class Game(metaclass=Singleton):
                     tree.getOwner().addBonusScore(1)
                     tree.getOwner().addScore(1)
 
-    def getBoard(self) -> Dict[CubeCoord, Cell]:
+    def getBoard(self) -> Dict[py.cube_coord.CubeCoord, py.cell.Cell]:
         return self.board.map
 
-    def getTrees(self) -> Dict[int, Tree]:
+    def getTrees(self) -> Dict[int, py.tree.Tree]:
         return self.trees
 
     def getShadows(self) -> Dict[int, int]:
@@ -667,14 +683,14 @@ class Game(metaclass=Singleton):
     def getTurn(self) -> int:
         return self.turn
 
-    def getSun(self) -> Sun:
+    def getSun(self) -> py.sun.Sun:
         return self.sun
 
     def getNutrients(self) -> int:
         return self.nutrients
 
-    def getCurrentFrameType(self) -> FrameType:
+    def getCurrentFrameType(self) -> py.frame_type.FrameType:
         return self.currentFrameType
 
-    def getSentSeeds(self) -> List[Seed]:
+    def getSentSeeds(self) -> List[py.seed.Seed]:
         return self.sentSeeds

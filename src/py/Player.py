@@ -1,15 +1,15 @@
-# package com.codingame.game
-from action.Action import Action
-from Config import Config
+from py.action.Action import Action
 
-from codingame import AbstractMultiplayerPlayer
+from py.codingame import AbstractMultiplayerPlayer
+
+import py.config
 
 
 class Player(AbstractMultiplayerPlayer):
     def __init__(self):
         self._message: str = None
         self._action: Action = Action.NO_ACTION
-        self._sun: int = Config.STARTING_SUN
+        self._sun: int = py.config.Config.STARTING_SUN
         self._waiting: bool = False
         self._bonusScore: int = 0
 
