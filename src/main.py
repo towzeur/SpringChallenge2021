@@ -16,13 +16,12 @@ cm = py.CommandManager()
 
 print(dir(py.exception))
 # from py.exception.CellNotValidException import CellNotValidException
-raise py.exception.CellNotValidException.CellNotValidException(37)
+# raise py.exception.CellNotValidException.CellNotValidException(37)
 
 r = py.Referee()
 r.init()
 
-exit()
-
+# exit()
 
 # ------
 
@@ -37,11 +36,3 @@ Collections.shuffle(L, r)
 print(L)  # [3, 4, 1, 8, 7, 6, 0, 2, 5, 9]
 
 # --
-from Tree import Tree
-
-Tree()
-
-
-from Referee import Referee
-
-Referee()
