@@ -8,6 +8,28 @@ from py.java.compat import Properties, Provider, Scanner, Singleton, JsonObject
 
 
 # ------------------------------------------------------------------------------
+# OutputCommand.java
+# ------------------------------------------------------------------------------
+
+
+class OutputCommand(Enum):
+    VIEW = 1
+    INFOS = 2
+    NEXT_PLAYER_INPUT = 3
+    NEXT_PLAYER_INFO = 4
+    SCORES = 5
+    UINPUT = 6
+    TOOLTIP = 7
+    SUMMARY = 8
+    METADATA = 9
+    FAIL = 10
+
+    def format(self, lineCount: int) -> str:
+        # self.name, self.value
+        return f"[[{self.name()}] {lineCount}]"
+
+
+# ------------------------------------------------------------------------------
 # Module.java
 # ------------------------------------------------------------------------------
 
@@ -56,7 +78,38 @@ class InputCommand:
         lineCount: int = int(m.group("lineCount"))
         return InputCommand(cmd, lineCount)
 
+# ------------------------------------------------------------------------------
+# OutputData.java
+# ------------------------------------------------------------------------------
 
+class OutputData: #(LinkedList<String>):
+
+    def __init__(self, command: OutputCommand):
+        self.__command: OutputCommand = command
+        self.__linkedList: List[str] = list() # ADDED
+    
+
+    def add(self, s: str) -> bool:
+        if s:
+            self.__linkedList.append(s)
+        return bool(s)
+
+    def addAll(self, data: List[str]):
+        if data:
+            self.__linkedList.extend(data)
+
+    #@Override
+    def __str__(self) -> str:
+        content: str = ''.join([line + '\n' for line in self.__linkedList]).strip()
+        length: int = len(content.split("\r\n|\r|\n")) if (content.length() > 0) else 0           
+
+        writer: StringWriter = StringWriter()
+        out: PrintWriter = PrintWriter(writer)
+        out.println(self.__command.format(length))
+        out.print(content)
+
+        return writer.toString().strip()
+    
 
 # ------------------------------------------------------------------------------
 # Tooltip.java
@@ -324,7 +377,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
 
             player.setTimeout(False)
 
-            InputCommand iCmd = InputCommand.parse(self.__s.nextLine())
+            iCmd: InputCommand = InputCommand.parse(self.__s.nextLine())
 
             if (iCmd.cmd != InputCommand.Command.GET_GAME_INFO):
                 raise RuntimeError("Invalid command: " + iCmd.cmd)
@@ -439,14 +492,14 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         self._out.println(data)
 
         if (self.__newTurn and self.__prevGameSummary != None):
-            OutputData summary = OutputData(self._getGameSummaryOutputCommand())
+            summary: OutputData = OutputData(self._getGameSummaryOutputCommand())
             summary.addAll(self.__prevGameSummary)
             self._out.println(summary)
         
 
         if (self.__newTurn and self.__prevTooltips != None and not self.__prevTooltips.isEmpty()):
             data = OutputData(OutputCommand.TOOLTIP)
-            for (Tooltip t : self.__prevTooltips):
+            for t in self.__prevTooltips: # t:Tooltip
                 data.add(t.message)
                 data.add(str.valueOf(t.player))
             
@@ -455,6 +508,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
     
     @abc.abstractmethod
     def _getGameSummaryOutputCommand(self) -> OutputCommand:
+        ...
 
     def __dumpNextPlayerInfos(self, nextPlayer: int, expectedOutputLineCount: int, timeout: int):
         data: OutputData = OutputData(OutputCommand.NEXT_PLAYER_INFO)
@@ -464,7 +518,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         self._out.println(data)
     
 
-    def __dumpNextPlayerInput(self, input: str[]):
+    def __dumpNextPlayerInput(self, input: List[str]):
         data: OutputData = OutputData(OutputCommand.NEXT_PLAYER_INPUT)
         data.addAll(input)
         self._out.println(data)
@@ -554,17 +608,17 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         return self.__firstTurnMaxTime
     
 
-    def setViewData(self, data: Object):
+    def setViewData(self, data: Any):
         setViewData("default", data)
     
 
-    def setViewData(self, moduleName: str, data: Object):
+    def setViewData(self, moduleName: str, data: Any):
         self.self.__currentViewData.add(moduleName, self.__gson.toJsonTree(data))
     
 
-    def setViewGlobalData(self, moduleName: str, data: Object):
+    def setViewGlobalData(self, moduleName: str, data: Any):
         if (self.__initDone):
-            raise IllegalStateException("Impossible to send global data to view outside of init phase")
+            raise ValueError("Impossible to send global data to view outside of init phase")
         
         self.self.__globalViewData.add(moduleName, self.__gson.toJsonTree(data))
     
@@ -708,29 +762,6 @@ class EndScreenModule(Module):
         data = (self.scores, self.titleRankingsSprite, self.displayedText)
         self.gameManager.setViewData("endScreen", data)
 
-
-
-
-# ------------------------------------------------------------------------------
-# OutputCommand.java
-# ------------------------------------------------------------------------------
-
-
-class OutputCommand(Enum):
-    VIEW = 1
-    INFOS = 2
-    NEXT_PLAYER_INPUT = 3
-    NEXT_PLAYER_INFO = 4
-    SCORES = 5
-    UINPUT = 6
-    TOOLTIP = 7
-    SUMMARY = 8
-    METADATA = 9
-    FAIL = 10
-
-    def format(self, lineCount: int) -> str:
-        # self.name, self.value
-        return f"[[{self.name()}] {lineCount}]"
 
 
 
@@ -895,7 +926,7 @@ class MultiplayerGameManager(GameManager, metaclass=Singleton):
             try:
                 self._seed = Long.parseLong(self._gameParameters.getProperty("seed"))
             except NumberFormatException as e:
-                log.warn(
+                self._log.warn(
                     "The seed property is not a number, it is reserved by the CodinGame platform to run arena games."
                 )
 
@@ -904,13 +935,13 @@ class MultiplayerGameManager(GameManager, metaclass=Singleton):
     # @Override protected
     def dumpGameProperties(self):
         msg: str = OutputCommand.UINPUT.format(self._gameParameters.size())
-        out.println(msg)
-        log.info(msg)
+        self._out.println(msg)
+        self._log.info(msg)
 
         for k, v in self._gameParameters.items():
             msg = f"{k}={v}"
-            out.println(msg)
-            log.info(msg)
+            self._out.println(msg)
+            self._log.info(msg)
 
     def getPlayerCount(self) -> int:
         return len(self.players)
