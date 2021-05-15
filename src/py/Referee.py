@@ -19,7 +19,7 @@ import py.game_summary_manager
 class Referee(AbstractReferee):
     def __init__(self):
         # @Inject private
-        self._gameManager: MultiplayerGameManager = None
+        self._gameManager: MultiplayerGameManager = MultiplayerGameManager()
         self._commandManager: py.command_manager.CommandManager = None
         self._game: py.game.Game = None
         self._endScreenModule: EndScreenModule = None
@@ -37,16 +37,17 @@ class Referee(AbstractReferee):
         try:
             py.config.Config.load(self._gameManager.getGameParameters())
             py.config.Config.export(self._gameManager.getGameParameters())
+
             self._gameManager.setFirstTurnMaxTime(1000)
             self._gameManager.setTurnMaxTime(100)
-
             self._gameManager.setFrameDuration(500)
 
             self._game.init(self.seed)
             self._sendGlobalInfo()
 
         except Exception as e:
-            e.printStackTrace()
+            # e.printStackTrace()
+            print(e)
             print("Referee failed to initialize", file=sys.stderr)
             self._abort()
 
