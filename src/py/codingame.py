@@ -101,7 +101,7 @@ class OutputData: #(LinkedList<String>):
     #@Override
     def __str__(self) -> str:
         content: str = ''.join([line + '\n' for line in self.__linkedList]).strip()
-        length: int = len(content.split("\r\n|\r|\n")) if (content.length() > 0) else 0           
+        length: int = len(content.split("\r\n|\r|\n")) if (len(content) > 0) else 0           
 
         writer: StringWriter = StringWriter()
         out: PrintWriter = PrintWriter(writer)
@@ -471,7 +471,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         
         viewData: str = data.tostr()
 
-        self.__totalViewDataBytesSent += viewData.length()
+        self.__totalViewDataBytesSent += len(viewData)
         if (self.__totalViewDataBytesSent > self.__VIEW_DATA_TOTAL_HARD_QUOTA):
             raise RuntimeError("The amount of data sent to the viewer is too big!")
         elif (self.__totalViewDataBytesSent > self.__VIEW_DATA_TOTAL_SOFT_QUOTA and not self.__viewWarning):
@@ -608,12 +608,14 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         return self.__firstTurnMaxTime
     
 
-    def setViewData(self, data: Any):
-        setViewData("default", data)
-    
-
-    def setViewData(self, moduleName: str, data: Any):
-        self.self.__currentViewData.add(moduleName, self.__gson.toJsonTree(data))
+    def setViewData(self, *args):
+        if len(args) == 1:
+            moduleName, data = "default", args[0]
+        elif len(args) == 2:
+            moduleName, data = args[0], args[1]
+        else:
+            raise TypeError('setViewData : unsupported parameters')
+        self.__currentViewData.add(moduleName, self.__gson.toJsonTree(data))
     
 
     def setViewGlobalData(self, moduleName: str, data: Any):
