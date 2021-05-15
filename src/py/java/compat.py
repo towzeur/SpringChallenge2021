@@ -132,6 +132,17 @@ class Collections:
             lst[i - 1], lst[j] = lst[j], lst[i - 1]  # swap(arr, i-1, j);
 
 
+class JsonObject:
+    def __init__(self):
+        self.d = {}
+
+    def addProperty(self, key, value):
+        self.d[key] = value
+
+    def add(self, key, value):
+        self.addProperty(key, value)
+
+
 # ------------------------------------------------------------------------------
 
 

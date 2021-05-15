@@ -4,7 +4,138 @@ from enum import Enum
 import re
 import logging
 
-from py.java.compat import Properties, Provider, Scanner, Singleton
+from py.java.compat import Properties, Provider, Scanner, Singleton, JsonObject
+
+
+# ------------------------------------------------------------------------------
+# Module.java
+# ------------------------------------------------------------------------------
+
+
+class Module(abc.ABC):  # interface
+    @abc.abstractmethod
+    def onGameInit(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def onAfterGameTurn(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def onAfterOnEnd(self):
+        raise NotImplementedError
+
+
+# ------------------------------------------------------------------------------
+# InputCommand.java
+# ------------------------------------------------------------------------------
+
+class InputCommand:
+    class Command(Enum):
+        INIT = 1
+        GET_GAME_INFO = 2
+        SET_PLAYER_OUTPUT = 3
+        SET_PLAYER_TIMEOUT = 4
+
+    HEADER_PATTERN: re.Pattern = re.compile(
+        r"\[\[(?P<cmd>.+)\] ?(?P<lineCount>[0-9]+)\]"
+    )
+
+    def __init__(self, cmd: "InputCommand.Command", lineCount: int):
+        self.cmd: "InputCommand.Command" = cmd
+        self.lineCount: int = lineCount
+
+    @staticmethod
+    def parse(line: str) -> "InputCommand":
+
+        m: re.Match = InputCommand.HEADER_PATTERN.match(line)
+        if not m.matches():
+            raise RuntimeError("Error in data sent to referee")
+
+        cmd: "InputCommand.Command" = InputCommand.Command.valueOf(m.group("cmd"))
+        lineCount: int = int(m.group("lineCount"))
+        return InputCommand(cmd, lineCount)
+
+
+
+# ------------------------------------------------------------------------------
+# Tooltip.java
+# ------------------------------------------------------------------------------
+
+class Tooltip:
+    """
+    The data for a tooltip which appears on the progress bar of the replay of a
+    game to give information about significant game events. You may create
+    several tooltips for the same turn.
+    """
+
+    def __init__(self, player: int, message: str):
+        """
+        Creates a tooltip which will appear on the replay of the current game.
+        The tooltip will have the same color as one of the players.
+        <p>
+        The message to display is typically no longer than 30 characters.
+        </p>
+
+        @param player
+                the index of the player the tooltip information is about.
+        @param message
+                the message to display in the tooltip.
+        """
+        self.player: int = player
+        self.message: str = message
+
+
+# ------------------------------------------------------------------------------
+# AbstractPlayer.java
+# ------------------------------------------------------------------------------
+
+
+class AbstractReferee(abc.ABC):
+    """
+    The Referee is the brain of your game, it implements all the rules and the turn order.
+    """
+
+    #
+    # <p>
+    # Called on startup, this method exists to create the initial state of the game, according to the given input.
+    # </p>
+    #
+    @abc.abstractmethod
+    def init(self):
+        ...
+
+    ##
+    # Called on the computation of each turn of the game.
+    # <p>
+    # A typical game turn:
+    # </p>
+    # <ul>
+    # <li>Send game information to each <code>Player</code> active on this turn.</li>
+    # <li>Those players' code are <code>executed</code>.</li>
+    # <li>Those players' inputs are read.</li>
+    # <li>The game logic is applied.</li>
+    # </ul>
+    #
+    # @param turn
+    #            which turn of the game is currently being computed. Starts at 1.
+    #
+    @abc.abstractmethod
+    def gameTurn(self, turn: int):
+        ...
+
+    ##
+    # <p>
+    # <i>Optional.</i>
+    # </p>
+    # This method is called once the final turn of the game is computed.
+    # <p>
+    # Typically, this method is used to set the players' final scores according to the final state of the game.
+    # </p>
+    #
+    def onEnd(self):
+        ...
+
 
 # ------------------------------------------------------------------------------
 # GameManager.java
@@ -32,7 +163,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
     
-    _log: Log = logging.getLogger('GameManager')
+    _log: logging.Logger = logging.getLogger('GameManager')
 
     __VIEW_DATA_TOTAL_SOFT_QUOTA: int = 512 # 1024
     __VIEW_DATA_TOTAL_HARD_QUOTA: int = 1024 # 1024
@@ -54,7 +185,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         self.__turnMaxTime: int = 50
         self.__firstTurnMaxTime: int = 1000
         self.__turn: int = None
-        frame: int = 0
+        self.__frame: int = 0
         self.__gameEnd: bool = False
         self.__s: Scanner = None
         self._out: PrintStream = None
@@ -137,8 +268,8 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
                     module.onAfterGameTurn()
 
                 # Create a frame if no player has been executed
-                if (not self._players.isEmpty() and self._players.stream().noneMatch(p -> p.hasBeenExecuted())):
-                    self._execute(self._players.get(0), 0)
+                if (not self._players.isEmpty() and not any(p.hasBeenExecuted() for p in self._players)):
+                    self._execute(self._players[0], 0)
                 
 
                 # reset self._players' outputs
@@ -147,8 +278,6 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
                     player.setHasBeenExecuted(False)
 
                 self.__turn += 1 # end of the foor loop 
-                
-            
 
             self._log.info("End")
 
@@ -169,7 +298,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
 
             self.__s.close()
 
-        except (Throwable e):
+        except ValueError as  e:
             self.__dumpFail(e)
             self.__s.close()
             raise e
@@ -190,7 +319,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
 
         try:
             if (not self.self.__initDone):
-                raise RuntimeException("Impossible to execute a player during init phase.")
+                raise RuntimeError("Impossible to execute a player during init phase.")
             
 
             player.setTimeout(False)
@@ -198,7 +327,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
             InputCommand iCmd = InputCommand.parse(self.__s.nextLine())
 
             if (iCmd.cmd != InputCommand.Command.GET_GAME_INFO):
-                raise RuntimeException("Invalid command: " + iCmd.cmd)
+                raise RuntimeError("Invalid command: " + iCmd.cmd)
             
 
             self.__dumpView()
@@ -207,25 +336,25 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
             if (nbrOutputLines > 0):
                 self.__addTurnTime()
             
-            self.__dumpNextPlayerInfos(player.getIndex(), nbrOutputLines, player.hasNeverBeenExecuted() ? self.__firstTurnMaxTime : self.__turnMaxTime)
+            self.__dumpNextPlayerInfos(player.getIndex(), nbrOutputLines, self.__firstTurnMaxTime if player.hasNeverBeenExecuted() else self.__turnMaxTime)
 
             # READ PLAYER OUTPUTS
             iCmd = InputCommand.parse(self.__s.nextLine())
             if (iCmd.cmd == InputCommand.Command.SET_PLAYER_OUTPUT):
                 output: List[str] = list()
-                for (int i = 0 i < iCmd.lineCount i++):
+                for i in range(iCmd.lineCount):
                     output.add(self.__s.nextLine())
                 
                 player.setOutputs(output)
             elif (iCmd.cmd == InputCommand.Command.SET_PLAYER_TIMEOUT):
                 player.setTimeout(True)
-             else:
-                raise RuntimeException("Invalid command: " + iCmd.cmd)
+            else:
+                raise RuntimeError("Invalid command: " + iCmd.cmd)
             
 
             player.resetInputs()
             self.__newTurn = False
-         except (Throwable e):
+        except ValueError as e:
             #Don't let the user except game fail exceptions
             self.__dumpFail(e)
             raise e
@@ -247,25 +376,25 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
     
 
     def __dumpMetadata(self):
-        OutputData data = OutputData(OutputCommand.METADATA)
+        data: OutputData = OutputData(OutputCommand.METADATA)
         data.add(self.__getMetadata())
         self._out.println(data)
     
 
     def __dumpScores(self):
-        OutputData data = OutputData(OutputCommand.SCORES)
-        List[str] playerScores = list()
-        for (AbstractPlayer player : self._players):
+        data: OutputData = OutputData(OutputCommand.SCORES)
+        playerScores: List[str] = list()
+        for player in self._players:
             playerScores.add(player.getIndex() + " " + player.getScore())
         
         data.addAll(playerScores)
         self._out.println(data)
     
 
-    def __dumpFail(self, e: Throwable):
-        OutputData data = OutputData(OutputCommand.FAIL)
-        strWriter sw = strWriter()
-        PrintWriter pw = PrintWriter(sw)
+    def __dumpFail(self, e: ValueError):
+        data: OutputData = OutputData(OutputCommand.FAIL)
+        sw: strWriter = strWriter()
+        pw: PrintWriter = PrintWriter(sw)
         e.printStackTrace(pw)
 
         data.add(sw.tostr())
@@ -275,23 +404,23 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
     def __dumpView(self):
         data: OutputData = OutputData(OutputCommand.VIEW)
         if (self.__newTurn):
-            data.add("KEY_FRAME " + frame)
+            data.add("KEY_FRAME " + self.__frame)
             if (self.__turn == 1):
-                JsonObject initFrame = JsonObject()
+                initFrame: JsonObject = JsonObject()
                 initFrame.add("global", self.__globalViewData)
                 initFrame.add("frame", self.__prevViewData)
                 data.add(initFrame.tostr())
-             else:
+            else:
                 data.add(self.__prevViewData.tostr())
             
-         else:
-            data.add("INTERMEDIATE_FRAME " + frame)
+        else:
+            data.add("INTERMEDIATE_FRAME " + self.__frame)
         
         viewData: str = data.tostr()
 
         self.__totalViewDataBytesSent += viewData.length()
         if (self.__totalViewDataBytesSent > self.__VIEW_DATA_TOTAL_HARD_QUOTA):
-            raise RuntimeException("The amount of data sent to the viewer is too big!")
+            raise RuntimeError("The amount of data sent to the viewer is too big!")
         elif (self.__totalViewDataBytesSent > self.__VIEW_DATA_TOTAL_SOFT_QUOTA and not self.__viewWarning):
             self._log.warn(
                 "Warning: the amount of data sent to the viewer is too big.\nPlease try to optimize your code to send less data (try replacing some commitEntityStates by a commitWorldState)."
@@ -302,7 +431,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         self._log.info(viewData)
         self._out.println(viewData)
 
-        frame++
+        self.__frame += 1
     
 
     def __dumpInfos(self):
@@ -339,7 +468,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         data: OutputData = OutputData(OutputCommand.NEXT_PLAYER_INPUT)
         data.addAll(input)
         self._out.println(data)
-        if (self._log.isInfoEnabled()):
+        if self._log.isEnabledFor(logging.INFO):
             self._log.info(data)
         
     
@@ -348,8 +477,8 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         return self.__gson.toJsonTree(self.__metadata).getAsJsonObject().tostr()
     
 
-    def setOuputsRead(self, self.__outputsRead: bool):
-        self.self.__outputsRead = self.__outputsRead
+    def setOuputsRead(self, outputsRead: bool):
+        self.self.__outputsRead = outputsRead
     
 
     def getOuputsRead(self) -> bool:
@@ -364,14 +493,13 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
         self.__metadata.put(key, value)
     
 
-    def setFrameDuration(self, self.__frameDuration: int):
-        if (self.__frameDuration <= 0):
-            raise IllegalArgumentException("Invalid frame duration: only positive frame duration is supported")
-        elif (self.self.__frameDuration != self.__frameDuration):
-            self.self.__frameDuration = self.__frameDuration
+    def setFrameDuration(self, frameDuration: int):
+        if (frameDuration <= 0):
+            raise ValueError("Invalid frame duration: only positive frame duration is supported")
+        elif (self.frameDuration != frameDuration):
+            self.__frameDuration = frameDuration
             self.__currentViewData.addProperty("duration", self.__frameDuration)
         
-    
 
 
     def getFrameDuration(self) -> int:
@@ -388,11 +516,10 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
     
 
 
-    def setMaxTurns(self, self.__maxTurns: int): # throws IllegalArgumentException:
-        if (self.__maxTurns <= 0):
-            raise IllegalArgumentException("Invalid maximum number of turns")
-        
-        self.self.__maxTurns = self.__maxTurns
+    def setMaxTurns(self, maxTurns: int): # throws ValueError:
+        if (maxTurns <= 0):
+            raise ValueError("Invalid maximum number of turns")
+        self.__maxTurns = maxTurns
     
 
     def getMaxTurns(self) -> int:
@@ -400,23 +527,21 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
     
 
 
-    def setTurnMaxTime(self, self.__turnMaxTime: int): # throws IllegalArgumentException:
-        if (self.__turnMaxTime < self.__MIN_TURN_TIME):
-            raise IllegalArgumentException("Invalid self.__turn max time : stay above 50ms")
-        elif (self.__turnMaxTime > self.__MAX_TURN_TIME):
-            raise IllegalArgumentException("Invalid self.__turn max time : stay under 25s")
-        
-        self.self.__turnMaxTime = self.__turnMaxTime
+    def setTurnMaxTime(self, turnMaxTime: int): # throws ValueError:
+        if (turnMaxTime < self.__MIN_TURN_TIME):
+            raise ValueError("Invalid turn max time : stay above 50ms")
+        elif (turnMaxTime > self.__MAX_TURN_TIME):
+            raise ValueError("Invalid turn max time : stay under 25s")
+        self.__turnMaxTime = turnMaxTime
     
     
 
-    def setFirstTurnMaxTime(self, self.__firstTurnMaxTime: int): #throws IllegalArgumentException:
-        if (self.__firstTurnMaxTime < self.__MIN_TURN_TIME):
-            raise IllegalArgumentException("Invalid turn max time : stay above 50ms")
-        elif (self.__firstTurnMaxTime > self.__MAX_TURN_TIME):
-            raise IllegalArgumentException("Invalid turn max time : stay under 25s")
-        
-        self.self.__firstTurnMaxTime = self.__firstTurnMaxTime
+    def setFirstTurnMaxTime(self, firstTurnMaxTime: int): #throws ValueError:
+        if (firstTurnMaxTime < self.__MIN_TURN_TIME):
+            raise ValueError("Invalid turn max time : stay above 50ms")
+        elif (firstTurnMaxTime > self.__MAX_TURN_TIME):
+            raise ValueError("Invalid turn max time : stay under 25s")
+        self.__firstTurnMaxTime = firstTurnMaxTime
     
 
 
@@ -471,7 +596,7 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
     def __addTurnTime(self):
         self.__totalTurnTime += self.__turnMaxTime
         if (self.__totalTurnTime > self.__GAME_DURATION_HARD_QUOTA):
-            raise RuntimeException(f"Total game duration too long (>{self.__GAME_DURATION_HARD_QUOTA}ms)")
+            raise RuntimeError(f"Total game duration too long (>{self.__GAME_DURATION_HARD_QUOTA}ms)")
         elif (self.__totalTurnTime > self.__GAME_DURATION_SOFT_QUOTA):
             self._log.warn(f"Warning: too many turns and/or too much time allocated to self._players per self.__turn ({self.__totalTurnTime}ms/{self.__GAME_DURATION_HARD_QUOTA}ms)")
         
@@ -494,23 +619,6 @@ class GameManager(abc.ABC): #<Any extends AbstractPlayer>: # abstract public
 
 
 
-# ------------------------------------------------------------------------------
-# Module.java
-# ------------------------------------------------------------------------------
-
-
-class Module(abc.ABC):  # interface
-    @abc.abstractmethod
-    def onGameInit(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def onAfterGameTurn(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def onAfterOnEnd(self):
-        raise NotImplementedError
 
 
 # ------------------------------------------------------------------------------
@@ -601,33 +709,6 @@ class EndScreenModule(Module):
         self.gameManager.setViewData("endScreen", data)
 
 
-# ------------------------------------------------------------------------------
-# Tooltip.java
-# ------------------------------------------------------------------------------
-
-
-class Tooltip:
-    """
-    The data for a tooltip which appears on the progress bar of the replay of a
-    game to give information about significant game events. You may create
-    several tooltips for the same turn.
-    """
-
-    def __init__(self, player: int, message: str):
-        """
-        Creates a tooltip which will appear on the replay of the current game.
-        The tooltip will have the same color as one of the players.
-        <p>
-        The message to display is typically no longer than 30 characters.
-        </p>
-
-        @param player
-                the index of the player the tooltip information is about.
-        @param message
-                the message to display in the tooltip.
-        """
-        self.player: int = player
-        self.message: str = message
 
 
 # ------------------------------------------------------------------------------
@@ -651,37 +732,6 @@ class OutputCommand(Enum):
         # self.name, self.value
         return f"[[{self.name()}] {lineCount}]"
 
-
-# ------------------------------------------------------------------------------
-# InputCommand.java
-# ------------------------------------------------------------------------------
-
-
-class InputCommand:
-    class Command(Enum):
-        INIT = 1
-        GET_GAME_INFO = 2
-        SET_PLAYER_OUTPUT = 3
-        SET_PLAYER_TIMEOUT = 4
-
-    HEADER_PATTERN: re.Pattern = re.compile(
-        r"\[\[(?P<cmd>.+)\] ?(?P<lineCount>[0-9]+)\]"
-    )
-
-    def __init__(self, cmd: "InputCommand.Command", lineCount: int):
-        self.cmd: "InputCommand.Command" = cmd
-        self.lineCount: int = lineCount
-
-    @staticmethod
-    def parse(line: str) -> "InputCommand":
-
-        m: re.Match = InputCommand.HEADER_PATTERN.match(line)
-        if not m.matches():
-            raise RuntimeError("Error in data sent to referee")
-
-        cmd: "InputCommand.Command" = InputCommand.Command.valueOf(m.group("cmd"))
-        lineCount: int = int(m.group("lineCount"))
-        return InputCommand(cmd, lineCount)
 
 
 # ------------------------------------------------------------------------------
@@ -894,52 +944,3 @@ class MultiplayerGameManager(GameManager, metaclass=Singleton):
         return OutputCommand.SUMMARY
 
 
-# ------------------------------------------------------------------------------
-# AbstractPlayer.java
-# ------------------------------------------------------------------------------
-
-
-class AbstractReferee(abc.ABC):
-    """
-    The Referee is the brain of your game, it implements all the rules and the turn order.
-    """
-
-    #
-    # <p>
-    # Called on startup, this method exists to create the initial state of the game, according to the given input.
-    # </p>
-    #
-    @abc.abstractmethod
-    def init(self):
-        ...
-
-    ##
-    # Called on the computation of each turn of the game.
-    # <p>
-    # A typical game turn:
-    # </p>
-    # <ul>
-    # <li>Send game information to each <code>Player</code> active on this turn.</li>
-    # <li>Those players' code are <code>executed</code>.</li>
-    # <li>Those players' inputs are read.</li>
-    # <li>The game logic is applied.</li>
-    # </ul>
-    #
-    # @param turn
-    #            which turn of the game is currently being computed. Starts at 1.
-    #
-    @abc.abstractmethod
-    def gameTurn(self, turn: int):
-        ...
-
-    ##
-    # <p>
-    # <i>Optional.</i>
-    # </p>
-    # This method is called once the final turn of the game is computed.
-    # <p>
-    # Typically, this method is used to set the players' final scores according to the final state of the game.
-    # </p>
-    #
-    def onEnd(self):
-        ...
