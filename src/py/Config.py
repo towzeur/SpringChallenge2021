@@ -13,15 +13,13 @@ class Config:
 
     @staticmethod
     def load(params: Properties):
-        STARTING_SUN = Config.getFromParams(params, "STARTING_SUN", STARTING_SUN)
-        MAP_RING_COUNT = Config.getFromParams(params, "MAP_RING_COUNT", MAP_RING_COUNT)
-        STARTING_NUTRIENTS = Config.getFromParams(
-            params, "STARTING_NUTRIENTS_LUSH", STARTING_NUTRIENTS
+        Config.STARTING_SUN = Config.getFromParams(params, "STARTING_SUN", 0)
+        Config.MAP_RING_COUNT = Config.getFromParams(params, "MAP_RING_COUNT", 3)
+        Config.STARTING_NUTRIENTS = Config.getFromParams(
+            params, "STARTING_NUTRIENTS_LUSH", 20
         )
-        MAX_ROUNDS = Config.getFromParams(params, "MAX_ROUNDS", MAX_ROUNDS)
-        MAX_EMPTY_CELLS = Config.getFromParams(
-            params, "MAX_EMPTY_CELLS", MAX_EMPTY_CELLS
-        )
+        Config.MAX_ROUNDS = Config.getFromParams(params, "MAX_ROUNDS", 24)
+        Config.MAX_EMPTY_CELLS = Config.getFromParams(params, "MAX_EMPTY_CELLS", 10)
 
     @staticmethod
     def export(params: Properties):
@@ -36,7 +34,7 @@ class Config:
         params: Properties, name: str, defaultValue: Any, convert: Callable[[str], Any]
     ):
         inputValue: str = params.getProperty(name)
-        if inputValue is not None:
+        if inputValue:
             try:
                 return convert(inputValue)
             except ValueError:
